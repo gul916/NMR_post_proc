@@ -151,7 +151,7 @@ A = np.concatenate((A[:],end[:]))
 timeT = np.linspace(0,dureeT,nbPt)
 
 plt.ion()					# interactive mode on
-fig1 = plt.figure()
+fig1 = plt.figure(figsize=(10,14))
 fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
 
 ax1 = fig1.add_subplot(411)
@@ -215,7 +215,7 @@ fig1.show()					# affiche la figure a l'ecran
 ### Exploitation du signal
 ###----------------------------------------------------------------------------
 
-fig2 = plt.figure()
+fig2 = plt.figure(figsize=(10,14))
 fig2.suptitle("CPMG NMR signal processing", fontsize=16)
 ax1 = fig2.add_subplot(411)
 ax1.set_title("Raw FID !!! Different scales !!!")
@@ -337,7 +337,7 @@ echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
 # affichage des echos separés
 timeFullEcho = np.linspace(0,fullEcho-dw2,nbPtFullEcho)
-fig3 = plt.figure()
+fig3 = plt.figure(figsize=(10,14))
 ax1 = fig3.add_subplot(411)
 ax1.set_title("FID after echoes separation")
 
