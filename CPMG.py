@@ -525,3 +525,5 @@ fig3.show()					# Display figure
 
 
 print("\n------------------------------------------------------------------------\n\n")
+
+input('Press Any Key To Exit')	# have the graphs stay displayed even when launched from linux terminal
