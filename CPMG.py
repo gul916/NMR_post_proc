@@ -274,7 +274,7 @@ if (SVD_method == 1):
 #	t_2 = time()
 
 
-
+#	# ARRAYFIRE
 #	if (row*col < 2048*2048):
 #		af.set_backend('cpu')
 #	else:
