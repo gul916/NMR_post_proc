@@ -151,7 +151,7 @@ A = np.concatenate((A[:],end[:]))
 timeT = np.linspace(0,dureeT,nbPt)
 
 plt.ion()					# interactive mode on
-fig1 = plt.figure(figsize=(10,14))
+fig1 = plt.figure()
 fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
 
 ax1 = fig1.add_subplot(411)
@@ -205,7 +205,8 @@ ax4 = fig1.add_subplot(414)
 ax4.set_title("SPC with noise and dead time")
 ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:], nbPtFreq)).real)
 ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:nbPtHalfEcho]*nbEcho, nbPtFreq)).real)
-fig1.show()					# affiche la figure a l'ecran
+fig1.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
+fig1.show()					# Display figure
 
 
 
@@ -215,7 +216,7 @@ fig1.show()					# affiche la figure a l'ecran
 ### Exploitation du signal
 ###----------------------------------------------------------------------------
 
-fig2 = plt.figure(figsize=(10,14))
+fig2 = plt.figure()
 fig2.suptitle("CPMG NMR signal processing", fontsize=16)
 ax1 = fig2.add_subplot(411)
 ax1.set_title("Raw FID !!! Different scales !!!")
@@ -315,7 +316,8 @@ if (SVD_method == 1):
 	
 	echos1D = echos1D_rec[:].astype('complex')	# back to double precision
 
-fig2.show()
+fig2.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
+fig2.show()					# Display figure
 
 
 #%%
@@ -337,7 +339,8 @@ echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
 # affichage des echos separés
 timeFullEcho = np.linspace(0,fullEcho-dw2,nbPtFullEcho)
-fig3 = plt.figure(figsize=(10,14))
+fig3 = plt.figure()
+fig3.suptitle("Processing of separated echoes", fontsize=16)
 ax1 = fig3.add_subplot(411)
 ax1.set_title("FID after echoes separation")
 
@@ -517,7 +520,8 @@ for i in range (0, nbFullEchoTotal):
 ax4 = fig3.add_subplot(414)
 ax4.set_title("SPC after Imax ponderation and sum")
 ax4.plot(timeFullEcho[:],sommeSpect[0:nbPtFullEcho].real)
-fig3.show()			# affiche la figure a l'ecran
+fig3.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
+fig3.show()					# Display figure
 
 
 print("\n------------------------------------------------------------------------\n\n")
