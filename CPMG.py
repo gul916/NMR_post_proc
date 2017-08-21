@@ -16,12 +16,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import dot, linalg
 from time import time
+import svd_sfa as svd
 
 # demandés à l'utilisateur :
 firstDec = True
 fullEcho = 10e-3
 halfEcho = fullEcho / 2
-nbEcho = 20			# 38 for less than 8k points, 76 for more
+nbEcho = 76			# 38 for less than 8k points, 76 for more
 nbHalfEcho = (nbEcho * 2) 
 if firstDec == True:
 	nbHalfEcho += 1
@@ -32,6 +33,7 @@ dw2 = 2*dw
 nbPt = 16384			# nb de pts complexes  ( nbPt == td/2 )
 aquiT = (nbPt-1)*dw2	# temps acquisition total : aquiT = (nbPt-1)*dw2
 de = 96e-6				# temps de non-acquisition au début
+de = 0
 lb = 5/(np.pi*halfEcho)			# line broadening (Herz)
 
 # noise generation 
@@ -53,7 +55,7 @@ nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 # Method 1: on full 1D with echoes --> very long
 # Method 2: on full 2D of stacked echoes --> very fast
 # Method 3: on separated echoes --> fast
-SVD_method = 3
+SVD_method = 2
 #if nbPtSignal <= 8192:
 #	SVD_method = 1
 #else:
@@ -256,55 +258,18 @@ if (SVD_method == 1):
 	row = math.ceil(nbPtSignal / 2)
 	col = nbPtSignal - row + 1
 	echos1D = echos1D.astype('complex64')		# decrease SVD computation time
-	
-#	# SCIPY
-#	# decomposition
-#	print("SVD on Toeplitz matrix in progress. Please be patient.")
-#	t_0 = time()
-#	mat = linalg.toeplitz(echos1D[row-1::-1], echos1D[row-1::1])
-#	U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
-#	S = linalg.diagsvd(s[:], row, col)
-#	t_1 = time()
-#	
-#	# reconstruction
-#	mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
-#	echos1D_rec = np.empty([nbPtSignal],dtype='complex64')
-#	for i in range (0, nbPtSignal):
-#		echos1D_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
-#	t_2 = time()
 
-
-#	# ARRAYFIRE
-#	if (row*col < 2048*2048):
-#		af.set_backend('cpu')
-#	else:
-#		af.set_backend('unified')		# Bug :Anormally slow
-#			 # see https://github.com/arrayfire/arrayfire-python/issues/134
-	
-	af.set_backend('cpu')
-	af.info()
-	
-	# decomposition
+	# Avec svd_sfa.py
 	print("SVD on Toeplitz matrix in progress. Please be patient.")
 	t_0 = time()
 	mat = linalg.toeplitz(echos1D[row-1::-1], echos1D[row-1::1])
-	mat_af = af.to_array(mat[:,:])			# transfer to device
-	U_af, s_af, Vh_af = af.svd_inplace(mat_af[:,:])
-	S_af = af.diag(s_af[:], 0, False).as_type(af.Dtype.c32)
-	t_1 = time()
-	
-	# reconstruction
-	mat_rec_af = af.matmul(af.matmul(U_af[:,:thres], S_af[:thres,:thres]), \
-		Vh_af[:thres,:])
-	mat_rec = np.array(mat_rec_af[:,:])
-
+	mat_rec, thres = svd.svd_thres(mat)
 	echos1D_rec = np.empty([nbPtSignal],dtype='complex64')
 	for i in range (0, nbPtSignal):
 		echos1D_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
 	t_2 = time()
-	
-	print("Decomposition time:\t\t{0:8.2f}s".format(t_1 - t_0))
-	print("Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_1))
+
+	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("FID after SVD on Toeplitz matrix")
@@ -370,54 +335,24 @@ plt.show() # affiche la figure a l'ecran
 if (SVD_method == 2):
 	row, col = echos2D.shape
 	mat = echos2D.astype('complex64')		# decrease SVD computation time
-	
-#	# SCIPY
-#	# decomposition
-#	print("SVD on echoes matrix in progress. Please be patient.")
-#	t_0 = time()
-#	U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
-#	S = linalg.diagsvd(s, row, col)
-#	t_1 = time()
-#	
-#	# reconstruction
-#	mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
-#	t_2 = time()
 
-
-
-#	# ARRAYFIRE
-#	if (row*col < 2048*2048):
-#		af.set_backend('cpu')
-#	else:
-#		af.set_backend('unified')		# Bug :Abnormally slow
-#			# see https://github.com/arrayfire/arrayfire-python/issues/134
-	
-	af.set_backend('cpu')
-	af.info()
-	
-	# decomposition
-	print("SVD on echoes matrix in progress. Please be patient.")
+	# Avec svd_sfa.py
+	print("SVD on Toeplitz matrix in progress. Please be patient.")
 	t_0 = time()
-	mat_af = af.to_array(mat[:,:])			# transfer to device
-	U_af, s_af, Vh_af = af.svd_inplace(mat_af[:,:])
-	S_af = af.diag(s_af[:], 0, False).as_type(af.Dtype.c32)
-	t_1 = time()
-	
-	# reconstruction
-	mat_rec_af = af.matmul(af.matmul(U_af[:,:thres], S_af[:thres,:thres]), \
-		Vh_af[:thres,:])
-	mat_rec = np.array(mat_rec_af[:,:])
+	mat_rec, thres = svd.svd_thres(mat)
+	print('thres = ', thres)
+	echos1D_rec = np.empty([nbPtSignal],dtype='complex64')
 	t_2 = time()
-	
-	print("Decomposition time:\t\t{0:8.2f}s".format(t_1 - t_0))
-	print("Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_1))
-	
+
+	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+
 	echos2D = mat_rec[:,:].astype('complex')	# back to double precision
 	
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on echoes matrix")
 	for i in range (0, nbFullEchoTotal):
 		ax2.plot(timeFullEcho[:],(echos2D[i][0:nbPtFullEcho]).real)
+
 
 
 # Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
@@ -427,44 +362,24 @@ if (SVD_method == 3):
 	echos2D = echos2D.astype('complex64')		# decrease SVD computation time
 	echos2D_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
 	
-#	# ARRAYFIRE
-#	if (row*col < 2048*2048):
-#		af.set_backend('cpu')
-#	else:
-#		af.set_backend('unified')		# Bug :Abnormally slow
-#			 # see https://github.com/arrayfire/arrayfire-python/issues/134
+	# # ARRAYFIRE
+	# if (row*col < 2048*2048):
+	# 	af.set_backend('cpu')
+	# else:
+	# 	af.set_backend('unified')		# Bug :Abnormally slow
+	# 		 # see https://github.com/arrayfire/arrayfire-python/issues/134
 	
-	af.set_backend('cpu')
-	af.info()
+	# af.set_backend('cpu')
+	# af.info()
 	
 	print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
 	t_0 = time()
 	
 	for i in range (0, nbFullEchoTotal):
-#		# SCIPY
-#		# decomposition
-#		mat = linalg.toeplitz(echos2D[i,row-1::-1], echos2D[i,row-1::1])
-#		U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
-#		S = linalg.diagsvd(s[:], row, col)
-#		
-#		# reconstruction
-#		mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
-#		for j in range (0, nbPtFullEcho):
-#			echos2D_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
 
-
-
-#		# ARRAYFIRE
-		# decomposition
+		# Avec svd_sfa.py
 		mat = linalg.toeplitz(echos2D[i,row-1::-1], echos2D[i,row-1::1])
-		mat_af = af.to_array(mat[:,:])			# transfer to device
-		U_af, s_af, Vh_af = af.svd_inplace(mat_af[:,:])
-		S_af = af.diag(s_af[:], 0, False).as_type(af.Dtype.c32)
-		
-		# reconstruction
-		mat_rec_af = af.matmul(af.matmul(U_af[:,:thres], S_af[:thres,:thres]), \
-			Vh_af[:thres,:])
-		mat_rec = np.array(mat_rec_af[:,:])
+		mat_rec, thres = svd.svd_thres(mat)
 		for j in range (0, nbPtFullEcho):
 			echos2D_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
 
@@ -526,4 +441,4 @@ fig3.show()					# Display figure
 
 print("\n------------------------------------------------------------------------\n\n")
 
-input('Press Any Key To Exit')	# have the graphs stay displayed even when launched from linux terminal
+input('Press Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
