@@ -15,7 +15,7 @@ scipyOK = False
 ## 1 : force arrayfire use
 ## 2 : force skcuda use
 ## 3 : force scipy use
-svd_tools_resolution_override = 2
+svd_tools_resolution_override = 0
 
 print('File : svd_sfa.py')
 
@@ -155,6 +155,7 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 		print("\n------------------------------------------------------------------------\n")
 
 		# thresholding
+		print("thresholding...")
 		nval = None
 		if (thresMethod == 'IND'):
 			nval = indMethod(scpu,m,n)[0]
@@ -164,12 +165,19 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 			print("Invalid threshold method specified !")
 		
 		print("nval :",nval)
-
+		
+		try:
+			if nval <= 0:
+				raise ValueError
+		except ValueError:
+			print("No singular value detected, aborting SVD")
+			return data, nval
+		
 		print("\n------------------------------------------------------------------------\n")
 
 
 		# reconstruction
-		
+		print("reconstruction...")
 		denData = svd_reconstruction(u,sgpu,v,nval,svdTools)
 
 		# transpose
@@ -239,8 +247,9 @@ def svd_decomposition(mat, choice):
 	choice: svd frontend used
 	'''
 	if choice=='af':
+		af.device_gc()		# clear memory
 		mat_gpu = af.to_array(mat[:,:])
-		U, s_gpu, Vh = af.svd_inplace(mat_gpu[:,:])
+		U, s_gpu, Vh = af.svd(mat_gpu[:,:])
 		s_cpu = np.array(s_gpu)
 
 	elif choice=='cuda':
@@ -273,6 +282,7 @@ def svd_reconstruction(U, s_gpu, Vh, thres, choice):
 		mat_rec_gpu = af.matmul(U[:,:thres], 
 			af.matmul(S_gpu[:thres,:thres], Vh[:thres,:]))
 		mat_rec = np.array(mat_rec_gpu[:,:])
+		af.device_gc()		# clear memory
 
 	elif choice=='cuda':
 		S_gpu = gpuarray.zeros((thres,thres), np.complex64)

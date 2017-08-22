@@ -34,7 +34,7 @@ nbPt = 16384			# nb de pts complexes  ( nbPt == td/2 )
 aquiT = (nbPt-1)*dw2	# temps acquisition total : aquiT = (nbPt-1)*dw2
 de = 96e-6				# temps de non-acquisition au début
 de = 0
-lb = 5/(np.pi*halfEcho)			# line broadening (Herz)
+lb = 3/(np.pi*halfEcho)			# line broadening (Herz)
 
 # noise generation 
 mean = 0
@@ -383,7 +383,7 @@ if (SVD_method == 3):
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on Toeplitz matrix of echoes")
 	for i in range (0, nbFullEchoTotal):
-		ax2.plot(timeFullEcho[:],(echos2D_rec[i][:]).real)
+		ax2.plot(timeFullEcho[:],(echos2D_rec[i,:]).real)
 	
 	echos2D = echos2D_rec[:,:].astype('complex')	# back to double precision
 
@@ -395,7 +395,7 @@ Imax = np.empty([nbFullEchoTotal])
 for i in range (0, nbFullEchoTotal):
 	#Imax = np.amax((echos2D[i][:]).real)
 	#echos2D[i][0:nbPtFullEcho]*=Imax
-	Imax[i] = np.amax((echos2D[i][:]).real)
+	Imax[i] = np.amax((echos2D[i,:]).real)
 
 
 # correction T2
