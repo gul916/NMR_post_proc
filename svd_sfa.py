@@ -1,8 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import numpy as np
 import csv
+
+# Please create a function
 
 afOK = False
 cudaOK = False
@@ -13,7 +15,7 @@ scipyOK = False
 ## 1 : force arrayfire use
 ## 2 : force skcuda use
 ## 3 : force scipy use
-svd_tools_resolution_override = 0
+svd_tools_resolution_override = 3
 
 print('File : svd_sfa.py')
 
@@ -54,9 +56,8 @@ else:
 			,svd_tools_resolution_override,").")
 		print("Using default choice (0) :")
 
-	# arrayfire module loading cancelled in default choice for now
-	# due to errors in af methods
-	'''
+	# default choice
+	
 	try:
 		print('\nLoading module arrayfire ...')
 		import arrayfire as af
@@ -64,7 +65,7 @@ else:
 		print('Module arrayfire loaded successfully')
 	except ModuleNotFoundError:
 		print('Module arrayfire not found')
-	'''
+	
 	if (not afOK):
 		try:
 			print('\nLoading module skcuda ...')
@@ -74,7 +75,7 @@ else:
 		except ModuleNotFoundError:
 			print('Module skcuda not found')
 
-	if (not afOK)and(not cudaOK):
+	elif (not cudaOK):
 		try:
 			print('\nLoading module scipy ...')
 			from scipy import dot, linalg
@@ -88,20 +89,15 @@ else:
 
 def svd_thres(data,thresMethod='SL',max_err=5):
 	'''
-	svd_autoThres 	significant factor analysis - a program designed
-	    			to help determine the number of significant factors in a matrix.
-	
-	Factor Analysis in Chemistry, Third Edition, p387-389
-	Edmund R. Malinowki
+	denData, nval = svd_thres(data,thresMethod='SL',max_err=5)
+
+	data : data matrix
+	thresMethod : 
+		IND : Indicator Function (based on values difference)
+		SL : Significance Level (probability of beeing noise)
+	max_err : probability of being noise for SL
+	denData : denoised data matrix
 	'''
-
-	# data : data matrix
-	# thresMethod : 
-		# IND : Indicator Function
-		# SL : Significance Level
-	# max_err : probability of being noise for SL
-	# denData : denoised data matrix
-
 
 	try:
 		svdTools = svd_tools_resolution()
@@ -263,6 +259,12 @@ def svd_reconstruction(U, s, Vh, n, thres, choice):
 ###----------------------------------------------------------------------------
 ### THRESHOLDING METHODS
 ###----------------------------------------------------------------------------
+#significant factor analysis to help to determine
+#	the number of significant factors in a matrix.
+#
+#Factor Analysis in Chemistry, Third Edition, p387-389
+#Edmund R. Malinowki
+
 
 ## Indicator function IND
 def indMethod(s,m,n):
@@ -300,11 +302,11 @@ def indMethod(s,m,n):
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
-	    t[j][0] = j
-	    t[j][1] = ev[j]
-	    t[j][2] = re[j]
-	    t[j][3] = ind[j]
-	    t[j][4] = rev[j]
+	    t[j,0] = j
+	    t[j,1] = ev[j]
+	    t[j,2] = re[j]
+	    t[j,3] = ind[j]
+	    t[j,4] = rev[j]
 
 	return (nval,sdf,ev,sev,t)
 
@@ -344,8 +346,8 @@ def slMethod(s,m,n,max_err):
 		s1 = 2 * s1
 		if s1 < 1e-2:
 			s1 = 0
-		t[j][5] = s1
-	t[n-1][5] = None
+		t[j,5] = s1
+	t[n-1,5] = None
 
 	nval = (np.nonzero((t[:,5]) < max_err))[0]
 	if (nval.size==0):

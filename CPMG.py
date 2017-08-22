@@ -22,7 +22,7 @@ import svd_sfa as svd
 firstDec = True
 fullEcho = 10e-3
 halfEcho = fullEcho / 2
-nbEcho = 76			# 38 for less than 8k points, 76 for more
+nbEcho = 20			# 38 for less than 8k points, 76 for more
 nbHalfEcho = (nbEcho * 2) 
 if firstDec == True:
 	nbHalfEcho += 1
@@ -55,12 +55,7 @@ nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 # Method 1: on full 1D with echoes --> very long
 # Method 2: on full 2D of stacked echoes --> very fast
 # Method 3: on separated echoes --> fast
-SVD_method = 2
-#if nbPtSignal <= 8192:
-#	SVD_method = 1
-#else:
-#	SVD_method = 2
-thres = 16
+SVD_method = 1
 
 # 1st frequency
 t21 = 500e-3
@@ -441,4 +436,4 @@ fig3.show()					# Display figure
 
 print("\n------------------------------------------------------------------------\n\n")
 
-input('Press Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
+input('Press enter key to exit') # have the graphs stay displayed even when launched from linux terminal
