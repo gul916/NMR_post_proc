@@ -15,7 +15,7 @@ scipyOK = False
 ## 1 : force arrayfire use
 ## 2 : force skcuda use
 ## 3 : force scipy use
-svd_tools_resolution_override = 3
+svd_tools_resolution_override = 2
 
 print('File : svd_sfa.py')
 
@@ -24,6 +24,7 @@ if svd_tools_resolution_override == 1:
 		print('\nsvd_tools_resolution_override == 1  =>')
 		print('  Forcing load of module arrayfire ...')
 		import arrayfire as af
+		af.set_backend('cpu')
 		afOK = True
 		print('Module arrayfire loaded successfully')
 	except ModuleNotFoundError:
@@ -33,7 +34,10 @@ elif svd_tools_resolution_override == 2:
 	try:
 		print('\nsvd_tools_resolution_override == 2  =>')
 		print('  Forcing load of module skcuda ...')
-		import skcuda as sk
+		import pycuda.autoinit
+		import pycuda.gpuarray as gpuarray
+		import skcuda.linalg as culinalg
+		culinalg.init()
 		cudaOK = True
 		print('Module skcuda loaded successfully')
 	except ModuleNotFoundError:
@@ -69,7 +73,10 @@ else:
 	if (not afOK):
 		try:
 			print('\nLoading module skcuda ...')
-			import skcuda as sk
+			import pycuda.autoinit
+			import pycuda.gpuarray as gpuarray
+			import skcuda.linalg as culinalg
+			culinalg.init()
 			cudaOK = True
 			print('Module skcuda loaded successfully')
 		except ModuleNotFoundError:
@@ -115,7 +122,7 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 
 		# transpose if needed
 		#global m,n
-		[m,n] = np.shape(data)
+		[n,m] = np.shape(data)
 		print("m :",m)
 		print("n :",n)
 		
@@ -125,7 +132,7 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 			print("data transpose...")
 			data = data.transpose()
 			transp = 1
-			[m,n] = np.shape(data)
+			[n,m] = np.shape(data)
 			print("m :",m)
 			print("n :",n)
 
@@ -135,24 +142,24 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 		print("svd...")
 		
 		print("svdTools :",svdTools)
-		u, s, v = svd_decomposition(data,svdTools)
+		u, sgpu, scpu, v = svd_decomposition(data, svdTools)
 		
 		#global s
 		#u, s, v = linalg.svd(data, full_matrices=False)
 		print("u.shape :",u.shape)
 		print("v.shape :",v.shape)
-		print("s.shape :",s.shape)
-		print(s)
+		print("scpu.shape :",scpu.shape)
+		print(scpu)
 		
 
 		print("\n------------------------------------------------------------------------\n")
 
 		# thresholding
 		nval = None
-		if (thresMethod == 'SL'):
-			nval = slMethod(s,m,n,max_err)
-		elif (thresMethod == 'IND'):
-			nval = indMethod(s,m,n)[0]
+		if (thresMethod == 'IND'):
+			nval = indMethod(scpu,m,n)[0]
+		elif (thresMethod == 'SL'):
+			nval = slMethod(scpu,m,n,max_err)
 		else :
 			print("Invalid threshold method specified !")
 		
@@ -163,13 +170,13 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 
 		# reconstruction
 		
-		denData = svd_reconstruction(u,s,v,n,nval,svdTools)
+		denData = svd_reconstruction(u,sgpu,v,nval,svdTools)
 
 		# transpose
 		if transp == 1:
 		    denData = denData.transpose()
 
-		[m2,n2] = np.shape(denData)
+		[n2,m2] = np.shape(denData)
 		print("m2 :",m2)
 		print("n2 :",n2)
 
@@ -222,32 +229,60 @@ def svd_tools_resolution():
 
 
 def svd_decomposition(mat, choice):
-	#if choice=='cuda':
-
+	'''
+	U, s, s_cpu, Vh = svd_decomposition(mat, choice)
+	
+	U: left matrix
+	s: singular values in 1D array
+	s_cpu: copy of s to be used on cpu
+	Vh: hermitian transpose of right matrix
+	choice: svd frontend used
+	'''
 	if choice=='af':
-		mat_af = af.to_array(mat[:,:])
-		U, s, Vh = af.svd_inplace(mat_af[:,:])
+		mat_gpu = af.to_array(mat[:,:])
+		U, s_gpu, Vh = af.svd_inplace(mat_gpu[:,:])
+		s_cpu = np.array(s_gpu)
+
+	elif choice=='cuda':
+		mat_gpu = gpuarray.to_gpu(mat[:,:])
+		U, s_gpu, Vh = culinalg.svd(mat_gpu[:,:])
+		s_cpu = s_gpu.get()
 
 	elif choice=='scipy':
-		U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
-
+		U, s_cpu, Vh = linalg.svd(mat[:,:], full_matrices=False)
+		s_gpu = s_cpu[:]
 	else:
 		print("Unknown svd tools")
 
-	return U, s, Vh
+	return U, s_gpu, s_cpu, Vh
 
 
-def svd_reconstruction(U, s, Vh, n, thres, choice):
-	#if choice=='cuda':
-
+def svd_reconstruction(U, s_gpu, Vh, thres, choice):
+	'''
+	mat_rec = svd_reconstruction(U, s_gpu, Vh, thres, choice)
+	
+	mat_rec: reconstructed matrix
+	U: left matrix
+	s_gpu: copy of s to be used on cpu
+	Vh: hermitian transpose of right matrix
+	thres: number of singular values keeped
+	choice: svd frontend used
+	'''
 	if choice=='af':
-		S = af.diag(s[:], 0, False).as_type(af.Dtype.c32)
-		mat_rec_af = af.matmul(af.matmul(U[:,:thres], S[:thres,:thres]), \
-		Vh[:thres,:])
-		mat_rec = np.array(mat_rec_af[:,:])
+		S_gpu = af.diag(s_gpu[:thres], 0, False).as_type(af.Dtype.c32)
+		mat_rec_gpu = af.matmul(U[:,:thres], 
+			af.matmul(S_gpu[:thres,:thres], Vh[:thres,:]))
+		mat_rec = np.array(mat_rec_gpu[:,:])
+
+	elif choice=='cuda':
+		S_gpu = gpuarray.zeros((thres,thres), np.complex64)
+		S_gpu = culinalg.diag(s_gpu[:thres]).astype(np.complex64)
+		mat_rec_gpu = culinalg.dot(U[:,:thres], \
+			culinalg.dot(S_gpu[:,:], Vh[:thres,:]))
+		mat_rec = mat_rec_gpu.get()
 
 	elif choice=='scipy':
-		S = linalg.diagsvd(s[:], n, n)
+		S = linalg.diagsvd(s_gpu[:thres], thres, thres)
 		mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
 
 	else:
@@ -302,11 +337,11 @@ def indMethod(s,m,n):
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
-	    t[j,0] = j
-	    t[j,1] = ev[j]
-	    t[j,2] = re[j]
-	    t[j,3] = ind[j]
-	    t[j,4] = rev[j]
+		t[j,0] = j
+		t[j,1] = ev[j]
+		t[j,2] = re[j]
+		t[j,3] = ind[j]
+		t[j,4] = rev[j]
 
 	return (nval,sdf,ev,sev,t)
 

@@ -22,7 +22,7 @@ import svd_sfa as svd
 firstDec = True
 fullEcho = 10e-3
 halfEcho = fullEcho / 2
-nbEcho = 20			# 38 for less than 8k points, 76 for more
+nbEcho = 38			# 38 for less than 8k points, 76 for more
 nbHalfEcho = (nbEcho * 2) 
 if firstDec == True:
 	nbHalfEcho += 1
@@ -336,7 +336,6 @@ if (SVD_method == 2):
 	t_0 = time()
 	mat_rec, thres = svd.svd_thres(mat)
 	print('thres = ', thres)
-	echos1D_rec = np.empty([nbPtSignal],dtype='complex64')
 	t_2 = time()
 
 	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
