@@ -10,31 +10,33 @@ File started from CPMG_PAG_2017-08-11
 ### PARAMETERS
 ###----------------------------------------------------------------------------
 
-import arrayfire as af
+#import arrayfire as af
 import math
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import dot, linalg
 from time import time
+
 import svd_sfa as svd
+svd.init()
 
 # demandés à l'utilisateur :
 firstDec = True
 fullEcho = 10e-3
 halfEcho = fullEcho / 2
-nbEcho = 38			# 38 for less than 8k points, 76 for more
+nbEcho = 20					# 38 for less than 8k points, 76 for more
 nbHalfEcho = (nbEcho * 2) 
 if firstDec == True:
 	nbHalfEcho += 1
 
 # paramètres :
-dw = 24e-6			# temps entre 2 prises de points
+dw = 24e-6					# temps entre 2 prises de points
 dw2 = 2*dw
-nbPt = 16384			# nb de pts complexes  ( nbPt == td/2 )
-aquiT = (nbPt-1)*dw2	# temps acquisition total : aquiT = (nbPt-1)*dw2
-de = 96e-6				# temps de non-acquisition au début
-de = 0
-lb = 3/(np.pi*halfEcho)			# line broadening (Herz)
+nbPt = 16384				# nb de pts complexes  ( nbPt == td/2 )
+aquiT = (nbPt-1)*dw2		# temps acquisition total : aquiT = (nbPt-1)*dw2
+de = 96e-6					# temps de non-acquisition au début
+# de = 0
+lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
 # noise generation 
 mean = 0
@@ -52,10 +54,18 @@ missingPts = nbPt-nbPtHalfEcho*nbHalfEcho
 nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 
 # Singular Value Decomposition
+# 0 : no SVD applied
 # Method 1: on full 1D with echoes --> very long
 # Method 2: on full 2D of stacked echoes --> very fast
 # Method 3: on separated echoes --> fast
-SVD_method = 1
+SVD_method = 2
+
+
+#if nbPtSignal <= 8192:
+#	SVD_method = 1
+#else:
+#	SVD_method = 2
+#thres = 16
 
 # 1st frequency
 t21 = 500e-3
@@ -74,21 +84,23 @@ nu2 = -2500
 ###----------------------------------------------------------------------------
 
 print("\n------------------------------------------------------------------------")
+print('File : cpmg.py')
+print("------------------------------------------------------------------------\n")
 print("\nSYNTHESE DES VALEURS :")
-print("\nValeurs demandées à l'utilisateur :")
+print("\n Valeurs demandées à l'utilisateur :\n")
 print("\tfirstDec =", firstDec)
 print("\tfullEcho =", fullEcho)
 print("\thalfEcho =", halfEcho, "(déduit de full echo)")
 print("\tnbEcho =", nbEcho)
 print("\tnbHalfEcho =", nbHalfEcho, "(calculée : dépend de 1ere decroissance ou non)")
 
-print("\nValeurs passées en paramètres :")
+print("\n Valeurs passées en paramètres :\n")
 print("\tdw =", dw)
 print("\tnbPt =", nbPt)
 print("\taquiT =", aquiT)
 print("\tde =", de)
 
-print("\nValeurs calculées :")
+print("\n Valeurs calculées :\n")
 print("\tdureeSignal =", dureeSignal)
 print("\tduree totale (dureeT) =", dureeT)
 print("\tnbPtHalfEcho =", nbPtHalfEcho)
@@ -98,6 +110,8 @@ print("\tnbPtSignal =", nbPtSignal)
 print("\tmissingPts =", missingPts)
 print("\tnbPtDeadTime =", nbPtDeadTime)
 
+
+print("\nSpecified SVD method :", SVD_method)
 
 
 #%%----------------------------------------------------------------------------
@@ -109,7 +123,7 @@ desc = firstDec
 A = np.array([])
 
 print("\n------------------------------------------------------------------------")
-print("\n 1er point de chaque demi echo à la creation : ")
+# print("\n 1er point de chaque demi echo à la creation : ")
 # tracé de la courbe par les demi echos
 for i in range (0, nbHalfEcho):
 
@@ -134,7 +148,7 @@ for i in range (0, nbHalfEcho):
 		yi = yi1 + yi2
 	desc = not(desc)
 
-	print("\t1er elem du demi echo", i ," =", yi[0])
+	# print("\t1er elem du demi echo", i ," =", yi[0])
 
 	A = np.concatenate((A[:],yi[:]))
 
@@ -178,10 +192,11 @@ A+=noise
 #ax3.plot(timeT[:],A[:].real)
 
 
-print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
-for i in range (0, nbHalfEcho):
-	pt = i*nbPtHalfEcho
-	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
+# print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
+# for i in range (0, nbHalfEcho):
+# 	pt = i*nbPtHalfEcho
+# 	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
+
 
 # suppression de points pour prendre en compte le dead time
 
@@ -221,18 +236,19 @@ ax1.plot(timeT[:],A[:].real)
 
 # ajout de points à zero pour compenser le dead time
 zerosToAdd = np.zeros((nbPtDeadTime,), dtype=np.complex)
-print("\tzerosToAdd.size =", zerosToAdd.size)
+print("\nzerosToAdd.size =", zerosToAdd.size)
 A = np.concatenate((zerosToAdd[:],A[:]))
-print("\tA.size =", A.size)
+print("A.size =", A.size)
 
 
 # on supprime les points en trop
 echos1D = A[0:nbPtSignal]
 timeT = np.linspace(0, dureeSignal-dw2, nbPtSignal)
-print("\techos1D.size =",echos1D.size)
+print("echos1D.size =",echos1D.size)
 
 
 # preprocessing
+print("preprocessing...")
 desc = firstDec
 
 for i in range (0, nbHalfEcho):
@@ -250,31 +266,16 @@ ax2.plot(timeT[:],echos1D[:].real)
 
 # Singular Value Decompostion (SVD) on Toeplitz matrix
 if (SVD_method == 1):
-	row = math.ceil(nbPtSignal / 2)
-	col = nbPtSignal - row + 1
-	echos1D = echos1D.astype('complex64')		# decrease SVD computation time
-
-	# Avec svd_sfa.py
-	print("SVD on Toeplitz matrix in progress. Please be patient.")
-	t_0 = time()
-	mat = linalg.toeplitz(echos1D[row-1::-1], echos1D[row-1::1])
-	mat_rec, thres = svd.svd_thres(mat)
-	echos1D_rec = np.empty([nbPtSignal],dtype='complex64')
-	for i in range (0, nbPtSignal):
-		echos1D_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
-	t_2 = time()
-
-	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+	echos1D = svd.svd(echos1D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("FID after SVD on Toeplitz matrix")
-	ax3.plot(timeT[:], echos1D_rec[:].real)
+	ax3.plot(timeT[:], echos1D[:].real)
 	
 	ax4 = fig2.add_subplot(414)
 	ax4.set_title("SPC after SVD on Toeplitz matrix")
-	ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(echos1D_rec[:], nbPtFreq)).real)
-	
-	echos1D = echos1D_rec[:].astype('complex')	# back to double precision
+	ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(echos1D[:], nbPtFreq)).real)
+
 
 fig2.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
 fig2.show()					# Display figure
@@ -287,13 +288,13 @@ if firstDec:
 	A[0:nbPtHalfEcho] *= 2		# !!! A mettre juste avant la FFT
 	firstHalfEcho = np.zeros((nbPtHalfEcho,), dtype=np.complex)
 	echos1D = np.concatenate((firstHalfEcho[:],echos1D[:]))
-print("\techos1D.size =", echos1D.size)
+print("echos1D.size =", echos1D.size)
 
 
 # separation après avoir determiné le nb de pts des echos et le nb d'echos
 nbPtFullEcho = 2*nbPtHalfEcho
 nbFullEchoTotal = int((nbHalfEcho+1)/2) 
-print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
+# print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
 echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
 
@@ -309,8 +310,8 @@ for i in range (0, nbFullEchoTotal):
 		#echos2D[i][j]+=2*i
 	ax1.plot(timeFullEcho[:],(echos2D[i][0:nbPtFullEcho]).real)
 
-	print("\t1er elem du demi echo", 2*i ," =", echos2D[i][0])
-	print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i][nbPtHalfEcho])
+	# print("\t1er elem du demi echo", 2*i ," =", echos2D[i][0])
+	# print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i][nbPtHalfEcho])
 
 
 '''
@@ -328,20 +329,8 @@ plt.show() # affiche la figure a l'ecran
 
 # Singular Value Decompostion (SVD) on echo matrix
 if (SVD_method == 2):
-	row, col = echos2D.shape
-	mat = echos2D.astype('complex64')		# decrease SVD computation time
+	echos2D = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 
-	# Avec svd_sfa.py
-	print("SVD on Toeplitz matrix in progress. Please be patient.")
-	t_0 = time()
-	mat_rec, thres = svd.svd_thres(mat)
-	print('thres = ', thres)
-	t_2 = time()
-
-	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
-
-	echos2D = mat_rec[:,:].astype('complex')	# back to double precision
-	
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on echoes matrix")
 	for i in range (0, nbFullEchoTotal):
@@ -351,41 +340,13 @@ if (SVD_method == 2):
 
 # Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
 if (SVD_method == 3):
-	row = math.ceil(nbPtFullEcho / 2)
-	col = nbPtFullEcho - row + 1
-	echos2D = echos2D.astype('complex64')		# decrease SVD computation time
-	echos2D_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
-	
-	# # ARRAYFIRE
-	# if (row*col < 2048*2048):
-	# 	af.set_backend('cpu')
-	# else:
-	# 	af.set_backend('unified')		# Bug :Abnormally slow
-	# 		 # see https://github.com/arrayfire/arrayfire-python/issues/134
-	
-	# af.set_backend('cpu')
-	# af.info()
-	
-	print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
-	t_0 = time()
-	
-	for i in range (0, nbFullEchoTotal):
+	echos2D = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 
-		# Avec svd_sfa.py
-		mat = linalg.toeplitz(echos2D[i,row-1::-1], echos2D[i,row-1::1])
-		mat_rec, thres = svd.svd_thres(mat)
-		for j in range (0, nbPtFullEcho):
-			echos2D_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
-
-	t_2 = time()
-	print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
-	
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on Toeplitz matrix of echoes")
 	for i in range (0, nbFullEchoTotal):
-		ax2.plot(timeFullEcho[:],(echos2D_rec[i,:]).real)
+		ax2.plot(timeFullEcho[:],(echos2D[i][:]).real)
 	
-	echos2D = echos2D_rec[:,:].astype('complex')	# back to double precision
 
 # prediction lineaire
 
@@ -433,6 +394,6 @@ fig3.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
 fig3.show()					# Display figure
 
 
-print("\n------------------------------------------------------------------------\n\n")
+#print("\n------------------------------------------------------------------------\n\n")
 
-input('Press enter key to exit') # have the graphs stay displayed even when launched from linux terminal
+input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
