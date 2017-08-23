@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import math
 import numpy as np
 import csv
+from time import time
 
-# Please create a function
-
-afOK = False
-cudaOK = False
+arrayfireOK = False
+skcudaOK = False
 scipyOK = False
 
 # svd_tools_resolution_override  =>  
@@ -17,41 +17,68 @@ scipyOK = False
 ## 3 : force scipy use
 svd_tools_resolution_override = 0
 
+print("\n------------------------------------------------------------------------")
 print('File : svd_sfa.py')
+print("------------------------------------------------------------------------\n")
 
-if svd_tools_resolution_override == 1:
+print('Establishing modules to import / Importing')
+
+def import_arrayfire():
+	arrayfireLoad = False
 	try:
-		print('\nsvd_tools_resolution_override == 1  =>')
-		print('  Forcing load of module arrayfire ...')
+		print('\nLoading module arrayfire ...')
+		global af
 		import arrayfire as af
-		af.set_backend('cpu')
-		afOK = True
-		print('Module arrayfire loaded successfully')
 	except ModuleNotFoundError:
 		print('Module arrayfire not found')
+	else:
+		arrayfireLoad = True
+		print('Module arrayfire loaded successfully')
+	return arrayfireLoad
 
-elif svd_tools_resolution_override == 2:
+
+def import_skcuda():
+	skcudaLoad = False
 	try:
-		print('\nsvd_tools_resolution_override == 2  =>')
-		print('  Forcing load of module skcuda ...')
-		import pycuda.autoinit
-		import pycuda.gpuarray as gpuarray
-		import skcuda.linalg as culinalg
-		culinalg.init()
-		cudaOK = True
-		print('Module skcuda loaded successfully')
+		print('\nLoading module skcuda ...')
+		global sk
+		import skcuda as sk
 	except ModuleNotFoundError:
 		print('Module skcuda not found')
+	else:
+		skcudaLoad = True
+		print('Module skcuda loaded successfully')
+	return skcudaLoad
 
-elif svd_tools_resolution_override == 3:
+
+def import_scipy():
+	scipyLoad = False
 	try:
-		print('\nsvd_tools_resolution_override == 3  =>')
-		print('  Forcing load of module scipy ...')
+		print('\nLoading module scipy ...')
+		global dot, linalg
 		from scipy import dot, linalg
-		scipyOK = True
-		print('Module scipy loaded successfully')
 	except ModuleNotFoundError:
 		print('Module scipy not found')
+	else:
+		scipyLoad = True
+		print('Module scipy loaded successfully')
+	return scipyLoad
+
+
+if svd_tools_resolution_override == 1:
+	print('\nsvd_tools_resolution_override == 1  =>')
+	print('  Forcing load of module arrayfire')
+	arrayfireOK = import_arrayfire()
+
+elif svd_tools_resolution_override == 2:
+	print('\nsvd_tools_resolution_override == 2  =>')
+	print('  Forcing load of module skcuda')
+	skcudaOK = import_skcuda()
+
+elif svd_tools_resolution_override == 3:
+	print('\nsvd_tools_resolution_override == 3  =>')
+	print('  Forcing load of module scipy')
+	scipyOK = import_scipy()
 
 else:
 
@@ -60,136 +87,15 @@ else:
 			,svd_tools_resolution_override,").")
 		print("Using default choice (0) :")
 
-	# default choice
-	
-	try:
-		print('\nLoading module arrayfire ...')
-		import arrayfire as af
-		afOK = True
-		print('Module arrayfire loaded successfully')
-	except ModuleNotFoundError:
-		print('Module arrayfire not found')
-	
-	if (not afOK):
-		try:
-			print('\nLoading module skcuda ...')
-			import pycuda.autoinit
-			import pycuda.gpuarray as gpuarray
-			import skcuda.linalg as culinalg
-			culinalg.init()
-			cudaOK = True
-			print('Module skcuda loaded successfully')
-		except ModuleNotFoundError:
-			print('Module skcuda not found')
+	# arrayfire module loading cancelled in default choice for now
+	# due to errors in arrayfire methods
 
-	elif (not cudaOK):
-		try:
-			print('\nLoading module scipy ...')
-			from scipy import dot, linalg
-			scipyOK = True
-			print('Module scipy loaded successfully')
-		except ModuleNotFoundError:
-			print('Module scipy not found')
+	#arrayfireOK = import_arrayfire()
+	if (not arrayfireOK):
+		skcudaOK = import_skcuda()
 
-
-
-
-def svd_thres(data,thresMethod='SL',max_err=5):
-	'''
-	denData, nval = svd_thres(data,thresMethod='SL',max_err=5)
-
-	data : data matrix
-	thresMethod : 
-		IND : Indicator Function (based on values difference)
-		SL : Significance Level (probability of beeing noise)
-	max_err : probability of being noise for SL
-	denData : denoised data matrix
-	'''
-
-	try:
-		svdTools = svd_tools_resolution()
-	except ImportError as err:
-		print ("\nsvd_tools_resolution returns error :")
-		print("  ",err.args[0])
-		print("\nSVD unavailable. Resuming signal processing.")
-		nval = None
-		return data, nval
-	else:
-		print("\n------------------------------------------------------------------------\n")
-		print("thresMethod :",thresMethod)
-		print("max_err :",max_err)
-		print()
-
-		# transpose if needed
-		#global m,n
-		[n,m] = np.shape(data)
-		print("m :",m)
-		print("n :",n)
-		
-		transp = 0
-		
-		if(m<n):
-			print("data transpose...")
-			data = data.transpose()
-			transp = 1
-			[n,m] = np.shape(data)
-			print("m :",m)
-			print("n :",n)
-
-		print()
-
-		# svd
-		print("svd...")
-		
-		print("svdTools :",svdTools)
-		u, sgpu, scpu, v = svd_decomposition(data, svdTools)
-		
-		#global s
-		#u, s, v = linalg.svd(data, full_matrices=False)
-		print("u.shape :",u.shape)
-		print("v.shape :",v.shape)
-		print("scpu.shape :",scpu.shape)
-		print(scpu)
-		
-
-		print("\n------------------------------------------------------------------------\n")
-
-		# thresholding
-		print("thresholding...")
-		nval = None
-		if (thresMethod == 'IND'):
-			nval = indMethod(scpu,m,n)[0]
-		elif (thresMethod == 'SL'):
-			nval = slMethod(scpu,m,n,max_err)
-		else :
-			print("Invalid threshold method specified !")
-		
-		print("nval :",nval)
-		
-		try:
-			if nval <= 0:
-				raise ValueError
-		except ValueError:
-			print("No singular value detected, aborting SVD")
-			return data, nval
-		
-		print("\n------------------------------------------------------------------------\n")
-
-
-		# reconstruction
-		print("reconstruction...")
-		denData = svd_reconstruction(u,sgpu,v,nval,svdTools)
-
-		# transpose
-		if transp == 1:
-		    denData = denData.transpose()
-
-		[n2,m2] = np.shape(denData)
-		print("m2 :",m2)
-		print("n2 :",n2)
-
-		return denData, nval
-	
+	if (not arrayfireOK)and(not skcudaOK):
+		scipyOK = import_scipy()
 
 
 ###----------------------------------------------------------------------------
@@ -198,118 +104,78 @@ def svd_thres(data,thresMethod='SL',max_err=5):
 
 
 def svd_tools_resolution():
-	'''
-	if afOK:
-		choice = 'af'
-	elif cudaOK:
-		choice = 'cuda'
-	elif scipyOK:
-		choice = 'scipy'
-	else:
-		raise ImportError('Aucun module svd disponible.')
-	'''
+	print ("\nSVD tools resolution :")
 	if svd_tools_resolution_override == 1:
-		if afOK:
-			choice = 'af'
+		if arrayfireOK:
+			choice = 'arrayfire'
+			print("Using methods from module : arrayfire")
 		else:
 			raise ImportError('Selected SVD module (arrayfire) not found.')
 	elif svd_tools_resolution_override == 2:
-		if cudaOK:
-			choice = 'cuda'
+		if skcudaOK:
+			choice = 'skcuda'
+			print("Using methods from module : skcuda")
 		else:
 			raise ImportError('Selected SVD module (skcuda) not found.')
 	elif svd_tools_resolution_override == 3:
 		if scipyOK:
 			choice = 'scipy'
+			print("Using methods from module : scipy")
 		else:
 			raise ImportError('Selected SVD module (scipy) not found.')
 	else:
-		if afOK:
-			choice = 'af'
-		elif cudaOK:
-			choice = 'cuda'
+		if arrayfireOK:
+			choice = 'arrayfire'
+			print("Using methods from module : arrayfire")
+		elif skcudaOK:
+			choice = 'skcuda'
+			print("Using methods from module : skcuda")
 		elif scipyOK:
 			choice = 'scipy'
+			print("Using methods from module : scipy")
 		else:
 			raise ImportError('No SVD module available.')
 
 	return choice
 
 
+
+def svd_preliminary_operations(setSVDTools):
+	if setSVDTools == 'arrayfire':
+		#	if (row*col < 2048*2048):
+		#		af.set_backend('cpu')
+		#	else:
+		#		af.set_backend('unified')		# Bug :Anormally slow
+		#	# see https://github.com/arrayfire/arrayfire-python/issues/134
+		af.set_backend('cpu')
+		print("\nUsing arrayfire version :")
+		af.info()
+
+
+###----------------------------------------------------------------------------
+### svd_decomposition
+###----------------------------------------------------------------------------
+
 def svd_decomposition(mat, choice):
-	'''
-	U, s, s_cpu, Vh = svd_decomposition(mat, choice)
-	
-	U: left matrix
-	s: singular values in 1D array
-	s_cpu: copy of s to be used on cpu
-	Vh: hermitian transpose of right matrix
-	choice: svd frontend used
-	'''
-	if choice=='af':
-		af.device_gc()		# clear memory
-		mat_gpu = af.to_array(mat[:,:])
-		U, s_gpu, Vh = af.svd(mat_gpu[:,:])
-		s_cpu = np.array(s_gpu)
+	#if choice=='skcuda':
 
-	elif choice=='cuda':
-		mat_gpu = gpuarray.to_gpu(mat[:,:])
-		U, s_gpu, Vh = culinalg.svd(mat_gpu[:,:])
-		s_cpu = s_gpu.get()
+	if choice=='arrayfire':
+		mat_af = af.to_array(mat[:,:])
+		U, s, Vh = af.svd_inplace(mat_af[:,:])
 
 	elif choice=='scipy':
-		U, s_cpu, Vh = linalg.svd(mat[:,:], full_matrices=False)
-		s_gpu = s_cpu[:]
-	else:
-		print("Unknown svd tools")
-
-	return U, s_gpu, s_cpu, Vh
-
-
-def svd_reconstruction(U, s_gpu, Vh, thres, choice):
-	'''
-	mat_rec = svd_reconstruction(U, s_gpu, Vh, thres, choice)
-	
-	mat_rec: reconstructed matrix
-	U: left matrix
-	s_gpu: copy of s to be used on cpu
-	Vh: hermitian transpose of right matrix
-	thres: number of singular values keeped
-	choice: svd frontend used
-	'''
-	if choice=='af':
-		S_gpu = af.diag(s_gpu[:thres], 0, False).as_type(af.Dtype.c32)
-		mat_rec_gpu = af.matmul(U[:,:thres], 
-			af.matmul(S_gpu[:thres,:thres], Vh[:thres,:]))
-		mat_rec = np.array(mat_rec_gpu[:,:])
-		af.device_gc()		# clear memory
-
-	elif choice=='cuda':
-		S_gpu = gpuarray.zeros((thres,thres), np.complex64)
-		S_gpu = culinalg.diag(s_gpu[:thres]).astype(np.complex64)
-		mat_rec_gpu = culinalg.dot(U[:,:thres], \
-			culinalg.dot(S_gpu[:,:], Vh[:thres,:]))
-		mat_rec = mat_rec_gpu.get()
-
-	elif choice=='scipy':
-		S = linalg.diagsvd(s_gpu[:thres], thres, thres)
-		mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
+		U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
 
 	else:
 		print("Unknown svd tools")
 
-	return mat_rec
+	return U, s, Vh
+
 
 
 ###----------------------------------------------------------------------------
 ### THRESHOLDING METHODS
 ###----------------------------------------------------------------------------
-#significant factor analysis to help to determine
-#	the number of significant factors in a matrix.
-#
-#Factor Analysis in Chemistry, Third Edition, p387-389
-#Edmund R. Malinowki
-
 
 ## Indicator function IND
 def indMethod(s,m,n):
@@ -347,11 +213,11 @@ def indMethod(s,m,n):
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
-		t[j,0] = j
-		t[j,1] = ev[j]
-		t[j,2] = re[j]
-		t[j,3] = ind[j]
-		t[j,4] = rev[j]
+	    t[j][0] = j
+	    t[j][1] = ev[j]
+	    t[j][2] = re[j]
+	    t[j][3] = ind[j]
+	    t[j][4] = rev[j]
 
 	return (nval,sdf,ev,sev,t)
 
@@ -391,8 +257,8 @@ def slMethod(s,m,n,max_err):
 		s1 = 2 * s1
 		if s1 < 1e-2:
 			s1 = 0
-		t[j,5] = s1
-	t[n-1,5] = None
+		t[j][5] = s1
+	t[n-1][5] = None
 
 	nval = (np.nonzero((t[:,5]) < max_err))[0]
 	if (nval.size==0):
@@ -406,18 +272,209 @@ def slMethod(s,m,n,max_err):
 	# if nval ~= 0
 	# disp(['The real error (RE) is +/-', num2str(re(nval)), '.'])
 
-def svd_preliminary_operations():
-	if svd_tools_resolution() == 'af':	
-		#	if (row*col < 2048*2048):
-		#		af.set_backend('cpu')
-		#	else:
-		#		af.set_backend('unified')		# Bug :Anormally slow
-		#	# see https://github.com/arrayfire/arrayfire-python/issues/134
-		af.set_backend('cpu')
-		af.info()
+
+###----------------------------------------------------------------------------
+### svd_reconstruction
+###----------------------------------------------------------------------------
+
+def svd_reconstruction(U, s, Vh, thres, choice):
+	#if choice=='skcuda':
+
+	if choice=='arrayfire':
+		S = af.diag(s[:], 0, False).as_type(af.Dtype.c32)
+		mat_rec_af = af.matmul(af.matmul(U[:,:thres], S[:thres,:thres]), \
+		Vh[:thres,:])
+		mat_rec = np.array(mat_rec_af[:,:])
+
+	elif choice=='scipy':
+		S = linalg.diagsvd(s[:thres], thres, thres)
+		mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
+
+	return mat_rec
 
 
-#A = np.genfromtxt('/home/pagilles/fichiersTaf/CPMG/code/NMR_post_proc-master/toeplitz.csv',delimiter=',',dtype='complex')
-#print(A)
+###----------------------------------------------------------------------------
+### SVD THRESHOLD
+###----------------------------------------------------------------------------
 
-#svd_thres(A,'SL')
+
+def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
+	'''
+	svd_autoThres 	significant factor analysis - a program designed
+	    			to help determine the number of significant factors in a matrix.
+	
+	Factor Analysis in Chemistry, Third Edition, p387-389
+	Edmund R. Malinowki
+	'''
+
+	# data : data matrix
+	# thresMethod : 
+		# IND : Indicator Function
+		# SL : Significance Level
+	# max_err : probability of being noise for SL
+	# denData : denoised data matrix
+
+	denData = data
+
+	# transpose if needed
+	[m,n] = np.shape(data)
+	# print("m :",m)
+	# print("n :",n)
+	
+	transp = 0
+	
+	if(m<n):
+		#print("data transpose...")
+		data = data.transpose()
+		transp = 1
+		[m,n] = np.shape(data)
+		# print("m :",m)
+		# print("n :",n)
+
+	# svd decomposition
+	u, s, v = svd_decomposition(data,svdTools)	
+
+	# thresholding
+	nval = None
+	if (thresMethod == 'SL'):
+		nval = slMethod(s,m,n,max_err)
+	elif (thresMethod == 'IND'):
+		nval = indMethod(s,m,n)[0]
+	else :
+		print("Invalid threshold method specified ! Using default method (SL)")
+		nval = slMethod(s,m,n,max_err)
+
+	# reconstruction
+	denData = svd_reconstruction(u,s,v,nval,svdTools)
+
+	# transpose back if needed
+	if transp == 1:
+	    denData = denData.transpose()
+
+	# [m2,n2] = np.shape(denData)
+	# print("m2 :",m2)
+	# print("n2 :",n2)
+
+	return denData, nval
+
+
+###----------------------------------------------------------------------------
+### MAIN SVD METHOD
+###----------------------------------------------------------------------------
+
+
+# svdMethod :
+#
+## 1 : Singular Value Decompostion (SVD) on Toeplitz matrix
+##		=> on full 1D with echoes --> very long
+## 2 : Singular Value Decompostion (SVD) on echo matrix
+##		=> on full 2D of stacked echoes --> very fast
+## 3 : Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
+##		=> on separated echoes --> fast
+#
+
+def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
+	# default values
+	## returned if for some reason svd isn't performed
+	processedData = data
+	thres = None
+	if svdMethod not in [1,2,3]:
+		print("\nInvalid SVD method specified (",svdMethod,"). SVD not performed.")
+	else:
+		try:
+			print("\n------------------------------------------------------------------------")
+			svdTools = svd_tools_resolution()
+		except ImportError as err:
+			print ("\nsvd_tools_resolution returns error :")
+			print("  ",err.args[0])
+			print("\nSVD unavailable. Resuming signal processing.")
+		else:
+			svd_preliminary_operations(svdTools)
+			print()
+			print("thresMethod :",thresMethod)
+			print("max_err :",max_err)
+			print("svdMethod :",svdMethod)
+			print("\n------------------------------------------------------------------------\n")
+			if svdMethod == 1:
+				# Singular Value Decompostion (SVD) on Toeplitz matrix
+				print("SVD on Toeplitz matrix in progress. Please be patient.")
+				t_0 = time()
+
+				nbPtSignal = nbPtHalfEcho * nbHalfEcho
+				row = math.ceil(nbPtSignal / 2)
+				col = nbPtSignal - row + 1
+
+				data = data.astype('complex64')		# decrease SVD computation time
+				data_rec = np.empty([nbPtSignal],dtype='complex64')
+
+				mat = linalg.toeplitz(data[row-1::-1], data[row-1::1])
+				mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
+				for i in range (0, nbPtSignal):
+					data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
+
+				processedData = data_rec[:].astype('complex128')	# back to double precision
+
+				t_2 = time()
+				print("thres = ",thres)
+				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+
+			elif svdMethod == 2:
+				# Singular Value Decompostion (SVD) on echo matrix
+				print("SVD on echo matrix in progress. Please be patient.")
+				t_0 = time()
+
+				mat = data.astype('complex64')		# decrease SVD computation time
+
+				mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
+
+				processedData = mat_rec[:,:].astype('complex128')	# back to double precision
+
+				t_2 = time()
+				print("thres = ",thres)
+				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+				
+			elif svdMethod == 3:
+				# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
+				print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
+				t_0 = time()
+
+				nbPtFullEcho = 2*nbPtHalfEcho
+				nbFullEchoTotal = int((nbHalfEcho+1)/2)
+				row = math.ceil(nbPtFullEcho / 2)
+				col = nbPtFullEcho - row + 1
+
+				data = data.astype('complex64')		# decrease SVD computation time
+				data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
+				
+				for i in range (0, nbFullEchoTotal):
+					mat = linalg.toeplitz(data[i,row-1::-1], data[i,row-1::1])
+					mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
+					for j in range (0, nbPtFullEcho):
+						data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
+
+				processedData = data_rec[:,:].astype('complex128')	# back to double precision
+				
+				t_2 = time()
+				print("thres = ",thres)
+				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+
+	return processedData, thres
+
+
+
+
+###----------------------------------------------------------------------------
+### 							TEST ZONE
+### 		Beware for the test zone is messy and full of bugs
+###----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+
+	A = np.genfromtxt('/home/pagilles/fichiersTaf/CPMG/code/NMR_post_proc-master/toeplitz.csv',delimiter=',',dtype='complex128')
+	#print(A)
+
+	#svd_thres(A,'SL')
+
+	newA, threshold = svd(A,1)
+	print("threshold value : ", threshold)
+	input('\nPress Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
