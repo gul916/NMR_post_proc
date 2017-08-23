@@ -4,7 +4,10 @@
 import math
 import numpy as np
 import csv
+from scipy import linalg
 from time import time
+
+# Please create a function
 
 arrayfireOK = False
 skcudaOK = False
@@ -29,8 +32,8 @@ def import_arrayfire():
 		print('\nLoading module arrayfire ...')
 		global af
 		import arrayfire as af
-	except ModuleNotFoundError:
-		print('Module arrayfire not found')
+	except ImportError:
+		print('Error while loading module : arrayfire')
 	else:
 		arrayfireLoad = True
 		print('Module arrayfire loaded successfully')
@@ -41,10 +44,13 @@ def import_skcuda():
 	skcudaLoad = False
 	try:
 		print('\nLoading module skcuda ...')
-		global sk
-		import skcuda as sk
-	except ModuleNotFoundError:
-		print('Module skcuda not found')
+		global gpuarray, culinalg, cudriver
+		import pycuda.autoinit
+		import pycuda.driver as cudriver
+		import pycuda.gpuarray as gpuarray
+		import skcuda.linalg as culinalg
+	except ImportError:
+		print('Error while loading module : skcuda')
 	else:
 		skcudaLoad = True
 		print('Module skcuda loaded successfully')
@@ -57,8 +63,8 @@ def import_scipy():
 		print('\nLoading module scipy ...')
 		global dot, linalg
 		from scipy import dot, linalg
-	except ModuleNotFoundError:
-		print('Module scipy not found')
+	except ImportError:
+		print('Error while loading module : scipy')
 	else:
 		scipyLoad = True
 		print('Module scipy loaded successfully')
@@ -87,15 +93,15 @@ else:
 			,svd_tools_resolution_override,").")
 		print("Using default choice (0) :")
 
-	# arrayfire module loading cancelled in default choice for now
-	# due to errors in arrayfire methods
+	# default choice
 
-	#arrayfireOK = import_arrayfire()
+	arrayfireOK = import_arrayfire()
+
 	if (not arrayfireOK):
 		skcudaOK = import_skcuda()
 
-	if (not arrayfireOK)and(not skcudaOK):
-		scipyOK = import_scipy()
+		if (not skcudaOK):
+			scipyOK = import_scipy()
 
 
 ###----------------------------------------------------------------------------
@@ -150,6 +156,8 @@ def svd_preliminary_operations(setSVDTools):
 		af.set_backend('cpu')
 		print("\nUsing arrayfire version :")
 		af.info()
+	elif setSVDTools == 'skcuda':
+		culinalg.init()
 
 
 ###----------------------------------------------------------------------------
@@ -157,19 +165,35 @@ def svd_preliminary_operations(setSVDTools):
 ###----------------------------------------------------------------------------
 
 def svd_decomposition(mat, choice):
-	#if choice=='skcuda':
-
+	'''
+	U, s_gpu, s_cpu, Vh = svd_decomposition(mat, choice)
+	
+	U: left matrix
+	s_gpu: singular values in 1D array
+	s_cpu: copy of s to be used on cpu
+	Vh: hermitian transpose of right matrix
+	choice: svd frontend used
+	'''
 	if choice=='arrayfire':
-		mat_af = af.to_array(mat[:,:])
-		U, s, Vh = af.svd_inplace(mat_af[:,:])
+		af.device_gc()		# clear memory
+		mat_gpu = af.to_array(mat[:,:])
+		U, s_gpu, Vh = af.svd(mat_gpu[:,:])
+		s_cpu = np.array(s_gpu)
+
+	elif choice=='skcuda':
+		cudriver.pagelocked_empty()		# clear memory
+		mat_gpu = gpuarray.to_gpu(mat[:,:])
+		U, s_gpu, Vh = culinalg.svd(mat_gpu[:,:])
+		s_cpu = s_gpu.get()
 
 	elif choice=='scipy':
-		U, s, Vh = linalg.svd(mat[:,:], full_matrices=False)
+		U, s_cpu, Vh = linalg.svd(mat[:,:], full_matrices=False)
+		s_gpu = s_cpu	# scipy not using gpu => s_cpu and s_gpu are one and the same
 
 	else:
 		print("Unknown svd tools")
 
-	return U, s, Vh
+	return U, s_gpu, s_cpu, Vh
 
 
 
@@ -213,11 +237,11 @@ def indMethod(s,m,n):
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
-	    t[j][0] = j
-	    t[j][1] = ev[j]
-	    t[j][2] = re[j]
-	    t[j][3] = ind[j]
-	    t[j][4] = rev[j]
+	    t[j,0] = j
+	    t[j,1] = ev[j]
+	    t[j,2] = re[j]
+	    t[j,3] = ind[j]
+	    t[j,4] = rev[j]
 
 	return (nval,sdf,ev,sev,t)
 
@@ -277,18 +301,38 @@ def slMethod(s,m,n,max_err):
 ### svd_reconstruction
 ###----------------------------------------------------------------------------
 
-def svd_reconstruction(U, s, Vh, thres, choice):
-	#if choice=='skcuda':
-
+def svd_reconstruction(U, s_gpu, Vh, thres, choice):
+	'''
+	mat_rec = svd_reconstruction(U, s_gpu, Vh, thres, choice)
+	
+	mat_rec: reconstructed matrix
+	U: left matrix
+	s_gpu: copy of s to be used on cpu
+	Vh: hermitian transpose of right matrix
+	thres: number of singular values keeped
+	choice: svd frontend used
+	'''
 	if choice=='arrayfire':
-		S = af.diag(s[:], 0, False).as_type(af.Dtype.c32)
-		mat_rec_af = af.matmul(af.matmul(U[:,:thres], S[:thres,:thres]), \
-		Vh[:thres,:])
-		mat_rec = np.array(mat_rec_af[:,:])
+		S_gpu = af.diag(s_gpu[:thres], 0, False).as_type(af.Dtype.c32)
+		mat_rec_gpu = af.matmul(U[:,:thres], \
+			af.matmul(S_gpu[:thres,:thres], Vh[:thres,:]))
+		mat_rec = np.array(mat_rec_gpu[:,:])
+		af.device_gc()		# clear memory
+
+	elif choice=='skcuda':
+		S_gpu = gpuarray.zeros((thres,thres), np.complex64)
+		S_gpu = culinalg.diag(s_gpu[:thres]).astype(np.complex64)
+		mat_rec_gpu = culinalg.dot(U[:,:thres], \
+			culinalg.dot(S_gpu[:,:], Vh[:thres,:]))
+		mat_rec = mat_rec_gpu.get()
+		cudriver.pagelocked_empty()		# clear memory
 
 	elif choice=='scipy':
-		S = linalg.diagsvd(s[:thres], thres, thres)
+		S = linalg.diagsvd(s_gpu[:thres], thres, thres)
 		mat_rec = dot(U[:,:thres], dot(S[:thres,:thres], Vh[:thres,:]))
+
+	else:
+		print("Unknown svd tools")
 
 	return mat_rec
 
@@ -315,9 +359,10 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 	# denData : denoised data matrix
 
 	denData = data
+	nval = None
 
 	# transpose if needed
-	[m,n] = np.shape(data)
+	[n,m] = np.shape(data)
 	# print("m :",m)
 	# print("n :",n)
 	
@@ -327,25 +372,31 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 		#print("data transpose...")
 		data = data.transpose()
 		transp = 1
-		[m,n] = np.shape(data)
+		[n,m] = np.shape(data)
 		# print("m :",m)
 		# print("n :",n)
 
 	# svd decomposition
-	u, s, v = svd_decomposition(data,svdTools)	
+	u, sgpu, scpu, v = svd_decomposition(data,svdTools)	
 
 	# thresholding
-	nval = None
-	if (thresMethod == 'SL'):
-		nval = slMethod(s,m,n,max_err)
-	elif (thresMethod == 'IND'):
-		nval = indMethod(s,m,n)[0]
-	else :
-		print("Invalid threshold method specified ! Using default method (SL)")
-		nval = slMethod(s,m,n,max_err)
+	if (thresMethod == 'IND'):
+		nval = indMethod(scpu,m,n)[0]
+	else:
+		#if (thresMethod != 'SL'):
+		#	print("Invalid threshold method specified ! Using default method (SL)")
+		nval = slMethod(scpu,m,n,max_err)
+
+	try:
+		if nval <= 0:
+			raise ValueError
+	except ValueError:
+		print("No singular value detected, aborting SVD")
+		return data, nval
+
 
 	# reconstruction
-	denData = svd_reconstruction(u,s,v,nval,svdTools)
+	denData = svd_reconstruction(u,sgpu,v,nval,svdTools)
 
 	# transpose back if needed
 	if transp == 1:
@@ -395,70 +446,61 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 			print("max_err :",max_err)
 			print("svdMethod :",svdMethod)
 			print("\n------------------------------------------------------------------------\n")
+			
+			t_0 = time()
+			data64 = data.astype('complex64')		# decrease SVD computation time
+
 			if svdMethod == 1:
 				# Singular Value Decompostion (SVD) on Toeplitz matrix
 				print("SVD on Toeplitz matrix in progress. Please be patient.")
-				t_0 = time()
 
 				nbPtSignal = nbPtHalfEcho * nbHalfEcho
 				row = math.ceil(nbPtSignal / 2)
 				col = nbPtSignal - row + 1
 
-				data = data.astype('complex64')		# decrease SVD computation time
 				data_rec = np.empty([nbPtSignal],dtype='complex64')
 
-				mat = linalg.toeplitz(data[row-1::-1], data[row-1::1])
+				mat = linalg.toeplitz(data64[row-1::-1], data64[row-1::1])
 				mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
 				for i in range (0, nbPtSignal):
 					data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
 
-				processedData = data_rec[:].astype('complex128')	# back to double precision
-
-				t_2 = time()
 				print("thres = ",thres)
-				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+				
 
 			elif svdMethod == 2:
 				# Singular Value Decompostion (SVD) on echo matrix
 				print("SVD on echo matrix in progress. Please be patient.")
-				t_0 = time()
 
-				mat = data.astype('complex64')		# decrease SVD computation time
+				data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
 
-				mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
-
-				processedData = mat_rec[:,:].astype('complex128')	# back to double precision
-
-				t_2 = time()
 				print("thres = ",thres)
-				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
-				
+
+
 			elif svdMethod == 3:
 				# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
 				print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
-				t_0 = time()
 
 				nbPtFullEcho = 2*nbPtHalfEcho
 				nbFullEchoTotal = int((nbHalfEcho+1)/2)
 				row = math.ceil(nbPtFullEcho / 2)
 				col = nbPtFullEcho - row + 1
 
-				data = data.astype('complex64')		# decrease SVD computation time
 				data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
 				
 				for i in range (0, nbFullEchoTotal):
-					mat = linalg.toeplitz(data[i,row-1::-1], data[i,row-1::1])
+					mat = linalg.toeplitz(data64[i,row-1::-1], data64[i,row-1::1])
 					mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
+					print("thres = ",thres)
 					for j in range (0, nbPtFullEcho):
 						data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
 
-				processedData = data_rec[:,:].astype('complex128')	# back to double precision
-				
-				t_2 = time()
-				print("thres = ",thres)
-				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
-
-	return processedData, thres
+			
+			processedData = data_rec[:][:].astype('complex128')	# back to double precision
+			t_2 = time()
+			print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+	
+	return processedData
 
 
 

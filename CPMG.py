@@ -34,7 +34,7 @@ nbPt = 16384				# nb de pts complexes  ( nbPt == td/2 )
 aquiT = (nbPt-1)*dw2		# temps acquisition total : aquiT = (nbPt-1)*dw2
 de = 96e-6					# temps de non-acquisition au début
 de = 0
-lb = 5/(np.pi*halfEcho)		# line broadening (Herz)
+lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
 # noise generation 
 mean = 0
@@ -55,12 +55,12 @@ nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 # Method 1: on full 1D with echoes --> very long
 # Method 2: on full 2D of stacked echoes --> very fast
 # Method 3: on separated echoes --> fast
-SVD_method = 1
+SVD_method = 0
 #if nbPtSignal <= 8192:
 #	SVD_method = 1
 #else:
 #	SVD_method = 2
-thres = 16
+#thres = 16
 
 # 1st frequency
 t21 = 500e-3
@@ -255,7 +255,7 @@ ax2.plot(timeT[:],echos1D[:].real)
 
 # Singular Value Decompostion (SVD) on Toeplitz matrix
 if (SVD_method == 1):
-	echos1D, thres = svd.svd(echos1D,nbHalfEcho,nbPtHalfEcho,SVD_method)
+	echos1D = svd.svd(echos1D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("FID after SVD on Toeplitz matrix")
@@ -318,7 +318,7 @@ plt.show() # affiche la figure a l'ecran
 
 # Singular Value Decompostion (SVD) on echo matrix
 if (SVD_method == 2):
-	echos2D, thres = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
+	echos2D = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on echoes matrix")
@@ -329,7 +329,7 @@ if (SVD_method == 2):
 
 # Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
 if (SVD_method == 3):
-	echos2D, thres = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
+	echos2D = svd.svd(echos2D,nbHalfEcho,nbPtHalfEcho,SVD_method)
 
 	ax2 = fig3.add_subplot(412)
 	ax2.set_title("FID after SVD on Toeplitz matrix of echoes")
@@ -345,7 +345,7 @@ Imax = np.empty([nbFullEchoTotal])
 for i in range (0, nbFullEchoTotal):
 	#Imax = np.amax((echos2D[i][:]).real)
 	#echos2D[i][0:nbPtFullEcho]*=Imax
-	Imax[i] = np.amax((echos2D[i][:]).real)
+	Imax[i] = np.amax((echos2D[i,:]).real)
 
 
 # correction T2
@@ -385,4 +385,4 @@ fig3.show()					# Display figure
 
 print("\n------------------------------------------------------------------------\n\n")
 
-input('Press Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
+input('Press enter key to exit') # have the graphs stay displayed even when launched from linux terminal
