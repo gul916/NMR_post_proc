@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import math
@@ -7,24 +7,22 @@ import csv
 from scipy import linalg
 from time import time
 
-# Please create a function
 
-arrayfireOK = False
-skcudaOK = False
-scipyOK = False
-
-# svd_tools_resolution_override  =>  
+# svd_tools_resolution_override  =>  default value of override for init()
+# change it to change the default value of override in init()
 ## 0 : default choice (skcuda if available / scipy if not)
 ## 1 : force arrayfire use
 ## 2 : force skcuda use
 ## 3 : force scipy use
 svd_tools_resolution_override = 0
 
-print("\n------------------------------------------------------------------------")
-print('File : svd_sfa.py')
-print("------------------------------------------------------------------------\n")
+arrayfireOK = False
+skcudaOK = False
+scipyOK = False
+initCalled = False
 
-print('Establishing modules to import / Importing')
+modulesCheck = [svd_tools_resolution_override,arrayfireOK,skcudaOK,scipyOK,initCalled]
+
 
 def import_arrayfire():
 	arrayfireLoad = False
@@ -71,37 +69,56 @@ def import_scipy():
 	return scipyLoad
 
 
-if svd_tools_resolution_override == 1:
-	print('\nsvd_tools_resolution_override == 1  =>')
-	print('  Forcing load of module arrayfire')
-	arrayfireOK = import_arrayfire()
+def init(override=svd_tools_resolution_override):
 
-elif svd_tools_resolution_override == 2:
-	print('\nsvd_tools_resolution_override == 2  =>')
-	print('  Forcing load of module skcuda')
-	skcudaOK = import_skcuda()
+	arrayfireOK = False
+	skcudaOK = False
+	scipyOK = False
 
-elif svd_tools_resolution_override == 3:
-	print('\nsvd_tools_resolution_override == 3  =>')
-	print('  Forcing load of module scipy')
-	scipyOK = import_scipy()
+	print("\n------------------------------------------------------------------------")
+	print('File : svd_sfa.py')
+	print("------------------------------------------------------------------------\n")
 
-else:
+	print('Establishing modules to import / Importing')
 
-	if svd_tools_resolution_override != 0:
-		print("\nInvalid value specified for svd_tools_resolution_override ("\
-			,svd_tools_resolution_override,").")
-		print("Using default choice (0) :")
+	if override == 1:
+		print('\noverride == 1  =>')
+		print('  Forcing load of module arrayfire')
+		arrayfireOK = import_arrayfire()
 
-	# default choice
-
-	arrayfireOK = import_arrayfire()
-
-	if (not arrayfireOK):
+	elif override == 2:
+		print('\noverride == 2  =>')
+		print('  Forcing load of module skcuda')
 		skcudaOK = import_skcuda()
 
-		if (not skcudaOK):
-			scipyOK = import_scipy()
+	elif override == 3:
+		print('\noverride == 3  =>')
+		print('  Forcing load of module scipy')
+		scipyOK = import_scipy()
+
+	elif override == 0:
+		# default choice
+
+		arrayfireOK = import_arrayfire()
+
+		if (not arrayfireOK):
+			skcudaOK = import_skcuda()
+
+			if (not skcudaOK):
+				scipyOK = import_scipy()
+
+	else:
+		print("\nInvalid value specified for override ("\
+			,override,"). Correct values : 0 1 2 3")
+
+	initCalled = True
+
+	modulesCheck[0] = override
+	modulesCheck[1] = arrayfireOK
+	modulesCheck[2] = skcudaOK
+	modulesCheck[3] = scipyOK
+	modulesCheck[4] = initCalled
+
 
 
 ###----------------------------------------------------------------------------
@@ -110,26 +127,21 @@ else:
 
 
 def svd_tools_resolution():
+
+	override = modulesCheck[0]
+	arrayfireOK = modulesCheck[1]
+	skcudaOK = modulesCheck[2]
+	scipyOK = modulesCheck[3]
+	initCalled = modulesCheck[4]
+
 	print ("\nSVD tools resolution :")
-	if svd_tools_resolution_override == 1:
-		if arrayfireOK:
-			choice = 'arrayfire'
-			print("Using methods from module : arrayfire")
-		else:
-			raise ImportError('Selected SVD module (arrayfire) not found.')
-	elif svd_tools_resolution_override == 2:
-		if skcudaOK:
-			choice = 'skcuda'
-			print("Using methods from module : skcuda")
-		else:
-			raise ImportError('Selected SVD module (skcuda) not found.')
-	elif svd_tools_resolution_override == 3:
-		if scipyOK:
-			choice = 'scipy'
-			print("Using methods from module : scipy")
-		else:
-			raise ImportError('Selected SVD module (scipy) not found.')
-	else:
+	# print("override : ",override)
+	# print("arrayfireOK : ",arrayfireOK)
+	# print("skcudaOK : ",skcudaOK)
+	# print("scipyOK : ",scipyOK)
+	if not initCalled:
+		raise ImportError("init() function not called")
+	if override == 0:
 		if arrayfireOK:
 			choice = 'arrayfire'
 			print("Using methods from module : arrayfire")
@@ -141,6 +153,30 @@ def svd_tools_resolution():
 			print("Using methods from module : scipy")
 		else:
 			raise ImportError('No SVD module available.')
+	if override == 1:
+		if arrayfireOK:
+			choice = 'arrayfire'
+			print("Using methods from module : arrayfire")
+		else:
+			raise ImportError('Selected SVD module (arrayfire) not found.')
+	elif override == 2:
+		if skcudaOK:
+			choice = 'skcuda'
+			print("Using methods from module : skcuda")
+		else:
+			raise ImportError('Selected SVD module (skcuda) not found.')
+	elif override == 3:
+		if scipyOK:
+			choice = 'scipy'
+			print("Using methods from module : scipy")
+		else:
+			raise ImportError('Selected SVD module (scipy) not found.')
+	else:
+		errorMsg = "Specified override value incorrect ("
+		errorMsg += str(override)
+		errorMsg += "). Correct values : 0 1 2 3"
+		raise ImportError(errorMsg)
+		
 
 	return choice
 
@@ -233,7 +269,6 @@ def indMethod(s,m,n):
 	re = np.concatenate((re[:],null[:]))
 	ind = np.concatenate((ind[:],null[:]))
 
-	global t
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
@@ -387,12 +422,15 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 		#	print("Invalid threshold method specified ! Using default method (SL)")
 		nval = slMethod(scpu,m,n,max_err)
 
-	try:
-		if nval <= 0:
-			raise ValueError
-	except ValueError:
-		print("No singular value detected, aborting SVD")
-		return data, nval
+	# try:
+	# 	if nval <= 3:
+	# 		raise ValueError
+	# except ValueError:
+	# 	print("No singular value detected, aborting SVD")
+	# 	return data, nval
+
+	if nval <= 0:
+		raise ValueError
 
 
 	# reconstruction
@@ -428,7 +466,6 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 	# default values
 	## returned if for some reason svd isn't performed
 	processedData = data
-	thres = None
 	if svdMethod not in [1,2,3]:
 		print("\nInvalid SVD method specified (",svdMethod,"). SVD not performed.")
 	else:
@@ -447,58 +484,69 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 			print("svdMethod :",svdMethod)
 			print("\n------------------------------------------------------------------------\n")
 			
-			t_0 = time()
-			data64 = data.astype('complex64')		# decrease SVD computation time
+			#print('data[0,0] = ',data[0])
+			try:
 
-			if svdMethod == 1:
-				# Singular Value Decompostion (SVD) on Toeplitz matrix
-				print("SVD on Toeplitz matrix in progress. Please be patient.")
+				t_0 = time()
+				data64 = data.astype('complex64')		# decrease SVD computation time
 
-				nbPtSignal = nbPtHalfEcho * nbHalfEcho
-				row = math.ceil(nbPtSignal / 2)
-				col = nbPtSignal - row + 1
+				if svdMethod == 1:
+					# Singular Value Decompostion (SVD) on Toeplitz matrix
+					print("SVD on Toeplitz matrix in progress. Please be patient.")
 
-				data_rec = np.empty([nbPtSignal],dtype='complex64')
+					nbPtSignal = nbPtHalfEcho * nbHalfEcho
+					row = math.ceil(nbPtSignal / 2)
+					col = nbPtSignal - row + 1
 
-				mat = linalg.toeplitz(data64[row-1::-1], data64[row-1::1])
-				mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
-				for i in range (0, nbPtSignal):
-					data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
+					data_rec = np.empty([nbPtSignal],dtype='complex64')
 
-				print("thres = ",thres)
-				
-
-			elif svdMethod == 2:
-				# Singular Value Decompostion (SVD) on echo matrix
-				print("SVD on echo matrix in progress. Please be patient.")
-
-				data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
-
-				print("thres = ",thres)
-
-
-			elif svdMethod == 3:
-				# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
-				print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
-
-				nbPtFullEcho = 2*nbPtHalfEcho
-				nbFullEchoTotal = int((nbHalfEcho+1)/2)
-				row = math.ceil(nbPtFullEcho / 2)
-				col = nbPtFullEcho - row + 1
-
-				data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
-				
-				for i in range (0, nbFullEchoTotal):
-					mat = linalg.toeplitz(data64[i,row-1::-1], data64[i,row-1::1])
+					mat = linalg.toeplitz(data64[row-1::-1], data64[row-1::1])
 					mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
-					print("thres = ",thres)
-					for j in range (0, nbPtFullEcho):
-						data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
+					for i in range (0, nbPtSignal):
+						data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
 
+					print("thres = ",thres)
+					
+
+				elif svdMethod == 2:
+					# Singular Value Decompostion (SVD) on echo matrix
+					print("SVD on echo matrix in progress. Please be patient.")
+
+					data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
+
+					print("thres = ",thres)
+
+
+				elif svdMethod == 3:
+					# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
+					print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
+
+					nbPtFullEcho = 2*nbPtHalfEcho
+					nbFullEchoTotal = int((nbHalfEcho+1)/2)
+					row = math.ceil(nbPtFullEcho / 2)
+					col = nbPtFullEcho - row + 1
+
+					data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
+					
+					for i in range (0, nbFullEchoTotal):
+						mat = linalg.toeplitz(data64[i,row-1::-1], data64[i,row-1::1])
+						mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
+						print("thres = ",thres)
+						for j in range (0, nbPtFullEcho):
+							data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
+
+				
+				processedData = data_rec[:][:].astype('complex128')	# back to double precision
+				t_2 = time()
+				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+				print("\n------------------------------------------------------------------------\n")
 			
-			processedData = data_rec[:][:].astype('complex128')	# back to double precision
-			t_2 = time()
-			print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+			except ValueError:	# nval <= 0 dans svd_thres
+				print("No singular value detected, aborting SVD")
+				print("\n------------------------------------------------------------------------\n")
+				processedData = data
+
+			#print('processedData[0,0] = ',processedData[0])
 	
 	return processedData
 
@@ -512,11 +560,35 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 
 if __name__ == "__main__":
 
-	A = np.genfromtxt('/home/pagilles/fichiersTaf/CPMG/code/NMR_post_proc-master/toeplitz.csv',delimiter=',',dtype='complex128')
+	#A = np.genfromtxt('/home/pagilles/fichiersTaf/CPMG/code/NMR_post_proc-master/toeplitz.csv',delimiter=',',dtype='complex128')
 	#print(A)
 
 	#svd_thres(A,'SL')
 
-	newA, threshold = svd(A,1)
-	print("threshold value : ", threshold)
-	input('\nPress Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
+	#newA, threshold = svd(A,1)
+	#print("threshold value : ", threshold)
+	#input('\nPress Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
+
+	print("\n------------------------------------------------------------------------\n")
+	print('arrayfireOK :',arrayfireOK)
+	print('skcudaOK :',skcudaOK)
+	print('scipyOK :',scipyOK)
+	print('svd_tools_resolution_override :',svd_tools_resolution_override)
+	print('modulesCheck :',modulesCheck)
+	
+	print()
+	init()
+	print('svd_tools_resolution_override :',svd_tools_resolution_override)
+	print('modulesCheck :',modulesCheck)
+	
+	print()
+	init(2)
+	print('svd_tools_resolution_override :',svd_tools_resolution_override)
+	print('modulesCheck :',modulesCheck)
+
+	print()
+	init(3)
+	print('svd_tools_resolution_override :',svd_tools_resolution_override)
+	print('modulesCheck :',modulesCheck)
+	print("\n------------------------------------------------------------------------\n")
+

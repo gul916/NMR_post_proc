@@ -10,19 +10,20 @@ File started from CPMG_PAG_2017-08-11
 ### PARAMETERS
 ###----------------------------------------------------------------------------
 
-#import arrayfire as af
 import math
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import dot, linalg
 from time import time
+
 import svd_sfa as svd
+svd.init()
 
 # demandés à l'utilisateur :
 firstDec = True
 fullEcho = 10e-3
 halfEcho = fullEcho / 2
-nbEcho = 10					# 38 for less than 8k points, 76 for more
+nbEcho = 20					# 38 for less than 8k points, 76 for more
 nbHalfEcho = (nbEcho * 2) 
 if firstDec == True:
 	nbHalfEcho += 1
@@ -33,7 +34,7 @@ dw2 = 2*dw
 nbPt = 16384				# nb de pts complexes  ( nbPt == td/2 )
 aquiT = (nbPt-1)*dw2		# temps acquisition total : aquiT = (nbPt-1)*dw2
 de = 96e-6					# temps de non-acquisition au début
-de = 0
+# de = 0
 lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
 # noise generation 
@@ -52,10 +53,13 @@ missingPts = nbPt-nbPtHalfEcho*nbHalfEcho
 nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 
 # Singular Value Decomposition
+# 0 : no SVD applied
 # Method 1: on full 1D with echoes --> very long
 # Method 2: on full 2D of stacked echoes --> very fast
 # Method 3: on separated echoes --> fast
-SVD_method = 0
+SVD_method = 2
+
+
 #if nbPtSignal <= 8192:
 #	SVD_method = 1
 #else:
@@ -79,21 +83,23 @@ nu2 = -2500
 ###----------------------------------------------------------------------------
 
 print("\n------------------------------------------------------------------------")
+print('File : cpmg.py')
+print("------------------------------------------------------------------------\n")
 print("\nSYNTHESE DES VALEURS :")
-print("\nValeurs demandées à l'utilisateur :")
+print("\n Valeurs demandées à l'utilisateur :\n")
 print("\tfirstDec =", firstDec)
 print("\tfullEcho =", fullEcho)
 print("\thalfEcho =", halfEcho, "(déduit de full echo)")
 print("\tnbEcho =", nbEcho)
 print("\tnbHalfEcho =", nbHalfEcho, "(calculée : dépend de 1ere decroissance ou non)")
 
-print("\nValeurs passées en paramètres :")
+print("\n Valeurs passées en paramètres :\n")
 print("\tdw =", dw)
 print("\tnbPt =", nbPt)
 print("\taquiT =", aquiT)
 print("\tde =", de)
 
-print("\nValeurs calculées :")
+print("\n Valeurs calculées :\n")
 print("\tdureeSignal =", dureeSignal)
 print("\tduree totale (dureeT) =", dureeT)
 print("\tnbPtHalfEcho =", nbPtHalfEcho)
@@ -103,6 +109,8 @@ print("\tnbPtSignal =", nbPtSignal)
 print("\tmissingPts =", missingPts)
 print("\tnbPtDeadTime =", nbPtDeadTime)
 
+
+print("\nSpecified SVD method :", SVD_method)
 
 
 #%%----------------------------------------------------------------------------
@@ -114,7 +122,7 @@ desc = firstDec
 A = np.array([])
 
 print("\n------------------------------------------------------------------------")
-print("\n 1er point de chaque demi echo à la creation : ")
+# print("\n 1er point de chaque demi echo à la creation : ")
 # tracé de la courbe par les demi echos
 for i in range (0, nbHalfEcho):
 
@@ -139,7 +147,7 @@ for i in range (0, nbHalfEcho):
 		yi = yi1 + yi2
 	desc = not(desc)
 
-	print("\t1er elem du demi echo", i ," =", yi[0])
+	# print("\t1er elem du demi echo", i ," =", yi[0])
 
 	A = np.concatenate((A[:],yi[:]))
 
@@ -183,10 +191,11 @@ A+=noise
 #ax3.plot(timeT[:],A[:].real)
 
 
-print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
-for i in range (0, nbHalfEcho):
-	pt = i*nbPtHalfEcho
-	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
+# print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
+# for i in range (0, nbHalfEcho):
+# 	pt = i*nbPtHalfEcho
+# 	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
+
 
 # suppression de points pour prendre en compte le dead time
 
@@ -226,18 +235,19 @@ ax1.plot(timeT[:],A[:].real)
 
 # ajout de points à zero pour compenser le dead time
 zerosToAdd = np.zeros((nbPtDeadTime,), dtype=np.complex)
-print("\tzerosToAdd.size =", zerosToAdd.size)
+print("\nzerosToAdd.size =", zerosToAdd.size)
 A = np.concatenate((zerosToAdd[:],A[:]))
-print("\tA.size =", A.size)
+print("A.size =", A.size)
 
 
 # on supprime les points en trop
 echos1D = A[0:nbPtSignal]
 timeT = np.linspace(0, dureeSignal-dw2, nbPtSignal)
-print("\techos1D.size =",echos1D.size)
+print("echos1D.size =",echos1D.size)
 
 
 # preprocessing
+print("preprocessing...")
 desc = firstDec
 
 for i in range (0, nbHalfEcho):
@@ -277,13 +287,13 @@ if firstDec:
 	A[0:nbPtHalfEcho] *= 2		# !!! A mettre juste avant la FFT
 	firstHalfEcho = np.zeros((nbPtHalfEcho,), dtype=np.complex)
 	echos1D = np.concatenate((firstHalfEcho[:],echos1D[:]))
-print("\techos1D.size =", echos1D.size)
+print("echos1D.size =", echos1D.size)
 
 
 # separation après avoir determiné le nb de pts des echos et le nb d'echos
 nbPtFullEcho = 2*nbPtHalfEcho
 nbFullEchoTotal = int((nbHalfEcho+1)/2) 
-print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
+# print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
 echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
 
@@ -299,8 +309,8 @@ for i in range (0, nbFullEchoTotal):
 		#echos2D[i][j]+=2*i
 	ax1.plot(timeFullEcho[:],(echos2D[i][0:nbPtFullEcho]).real)
 
-	print("\t1er elem du demi echo", 2*i ," =", echos2D[i][0])
-	print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i][nbPtHalfEcho])
+	# print("\t1er elem du demi echo", 2*i ," =", echos2D[i][0])
+	# print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i][nbPtHalfEcho])
 
 
 '''
@@ -383,6 +393,6 @@ fig3.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
 fig3.show()					# Display figure
 
 
-print("\n------------------------------------------------------------------------\n\n")
+#print("\n------------------------------------------------------------------------\n\n")
 
-input('Press enter key to exit') # have the graphs stay displayed even when launched from linux terminal
+input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
