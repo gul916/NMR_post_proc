@@ -13,11 +13,14 @@ File started from CPMG_PAG_2017-08-11
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import dot, linalg
-from time import time
+
+import signal_generation as sigG
 
 import svd_sfa as svd
 svd.init()
+
+A = sigG.signalCreation().data
+print(A)
 
 # demandés à l'utilisateur :
 firstDec = True
@@ -35,11 +38,9 @@ nbPt = 16384				# nb de pts complexes  ( nbPt == td/2 )
 aquiT = (nbPt-1)*dw2		# temps acquisition total : aquiT = (nbPt-1)*dw2
 de = 96e-6					# temps de non-acquisition au début
 # de = 0
-lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
-# noise generation 
-mean = 0
-std = 0.3
+
+lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
 # calculés :
 dureeT = aquiT + de
@@ -59,23 +60,11 @@ nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 # Method 3: on separated echoes --> fast
 SVD_method = 2
 
-
 #if nbPtSignal <= 8192:
 #	SVD_method = 1
 #else:
 #	SVD_method = 2
 #thres = 16
-
-# 1st frequency
-t21 = 500e-3
-t21star = 1e-3
-nu1 = 1750
-
-# 2nd frequency
-t22 = 100e-3
-t22star = 0.5e-3
-nu2 = -2500
-
 
 
 ###----------------------------------------------------------------------------
@@ -113,120 +102,12 @@ print("\tnbPtDeadTime =", nbPtDeadTime)
 print("\nSpecified SVD method :", SVD_method)
 
 
-#%%----------------------------------------------------------------------------
-### SYNTHESE DE SIGNAL RMN
-###----------------------------------------------------------------------------
-
-
-desc = firstDec
-A = np.array([])
-
-print("\n------------------------------------------------------------------------")
-# print("\n 1er point de chaque demi echo à la creation : ")
-# tracé de la courbe par les demi echos
-for i in range (0, nbHalfEcho):
-
-	deb = i*halfEcho
-	fin = (i+1)*halfEcho-dw2
-
-	timei = np.linspace(deb,fin,nbPtHalfEcho)
-
-	if(desc==True):
-		yi1 = np.exp(1j*2*np.pi*nu1*(timei[:]-deb)) \
-			*np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)
-		yi2 = np.exp(1j*2*np.pi*nu2*(timei[:]-deb)) \
-			*np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)
-#		yi2 = np.zeros(timei.size, dtype='complex')
-		yi = yi1 + yi2
-	else:
-		yi1 = np.exp(1j*2*np.pi*nu1*(-(fin+dw2)+timei[:])) \
-			* np.exp((-(fin+dw2)+timei[:])/t21star) * np.exp(-(timei[:])/t21)
-		yi2 = np.exp(1j*2*np.pi*nu2*(-(fin+dw2)+timei[:])) \
-			* np.exp((-(fin+dw2)+timei[:])/t22star) * np.exp(-(timei[:])/t22)
-#		yi2 = np.zeros(timei.size, dtype='complex')
-		yi = yi1 + yi2
-	desc = not(desc)
-
-	# print("\t1er elem du demi echo", i ," =", yi[0])
-
-	A = np.concatenate((A[:],yi[:]))
-
-#print("\tA.size =",A.size)
-end = np.zeros((missingPts,), dtype=np.complex)
-A = np.concatenate((A[:],end[:]))
-#print("\tA.size =",A.size)
-
-
-# affichage de la matrice A (signal entier) avant ajout du bruit
-timeT = np.linspace(0,dureeT,nbPt)
-
-plt.ion()					# interactive mode on
-fig1 = plt.figure()
-fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
-
-ax1 = fig1.add_subplot(411)
-ax1.set_title("FID without noise")
-ax1.plot(timeT[:],A[:].real)
-
-nbPtFreq = nbPt*4
-freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
-ax2 = fig1.add_subplot(412)
-ax2.set_title("SPC without noise")
-ax2.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:], nbPtFreq)).real)
-ax2.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:nbPtHalfEcho]*nbEcho, nbPtFreq)).real)
-
-
-# noise generation 
-num_samples = nbPt
-noise = np.random.normal(mean, std, size=num_samples)
-
-# ajout du bruit au signal
-A+=noise
-
-
-## affichage de la matrice A (signal entier) après ajout du bruit
-#timeT = np.linspace(0,dureeT,nbPt)
-#ax3 = fig1.add_subplot(413)
-#ax3.set_title("FID with noise and dead time")
-#ax3.plot(timeT[:],A[:].real)
-
-
-# print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
-# for i in range (0, nbHalfEcho):
-# 	pt = i*nbPtHalfEcho
-# 	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
-
-
-# suppression de points pour prendre en compte le dead time
-
-A = A[nbPtDeadTime:]
-
-
-# affichage de la matrice A (signal entier) après prise en compte du dead time
-timeT = np.linspace(0,dureeT,nbPt-nbPtDeadTime)
-ax3 = fig1.add_subplot(413)
-ax3.set_title("FID with noise and dead time")
-ax3.plot(timeT[:],A[:].real)
-
-
-# affichage du spectre
-nbPtFreq = nbPt*4
-freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
-ax4 = fig1.add_subplot(414)
-ax4.set_title("SPC with noise and dead time")
-ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:], nbPtFreq)).real)
-ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:nbPtHalfEcho]*nbEcho, nbPtFreq)).real)
-fig1.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
-fig1.show()					# Display figure
-
-
-
-
 
 #%%----------------------------------------------------------------------------
 ### Exploitation du signal
 ###----------------------------------------------------------------------------
 
+timeT = np.linspace(0,dureeT,nbPt-nbPtDeadTime)
 fig2 = plt.figure()
 fig2.suptitle("CPMG NMR signal processing", fontsize=16)
 ax1 = fig2.add_subplot(411)

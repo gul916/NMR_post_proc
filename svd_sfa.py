@@ -153,7 +153,7 @@ def svd_tools_resolution():
 			print("Using methods from module : scipy")
 		else:
 			raise ImportError('No SVD module available.')
-	if override == 1:
+	elif override == 1:
 		if arrayfireOK:
 			choice = 'arrayfire'
 			print("Using methods from module : arrayfire")
@@ -250,17 +250,17 @@ def indMethod(s,m,n):
 	ind = np.zeros(n-1)
 
 	for j in range (0, n):
-	    ev[j] = s[j]**2
-	    df[j] = (m-j)*(n-j)
-	    rev[j] = ev[j] / df[j]
+		ev[j] = s[j]**2
+		df[j] = (m-j)*(n-j)
+		rev[j] = ev[j] / df[j]
 
 	for k in range (0, n-1):
-	    sev[k] = np.sum(ev[k+1:n])
-	    sdf[k] = np.sum(df[k+1:n])
+		sev[k] = np.sum(ev[k+1:n])
+		sdf[k] = np.sum(df[k+1:n])
 
 	for i in range (0, n-1):
-	    re[i] = np.sqrt(sev[i] / (m * (n-i-1)))		# see eq. 4.44
-	    ind[i] = re[i] / (n-i-1)**2					# see eq. 4.63
+		re[i] = np.sqrt(sev[i] / (m * (n-i-1)))		# see eq. 4.44
+		ind[i] = re[i] / (n-i-1)**2					# see eq. 4.63
 
 
 	nval = np.argmin(ind)+1
@@ -272,11 +272,11 @@ def indMethod(s,m,n):
 	t = np.zeros((n,6))
 
 	for j in range (0, n):
-	    t[j,0] = j
-	    t[j,1] = ev[j]
-	    t[j,2] = re[j]
-	    t[j,3] = ind[j]
-	    t[j,4] = rev[j]
+		t[j,0] = j
+		t[j,1] = ev[j]
+		t[j,2] = re[j]
+		t[j,3] = ind[j]
+		t[j,4] = rev[j]
 
 	return (nval,sdf,ev,sev,t)
 
@@ -380,7 +380,7 @@ def svd_reconstruction(U, s_gpu, Vh, thres, choice):
 def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 	'''
 	svd_autoThres 	significant factor analysis - a program designed
-	    			to help determine the number of significant factors in a matrix.
+					to help determine the number of significant factors in a matrix.
 	
 	Factor Analysis in Chemistry, Third Edition, p387-389
 	Edmund R. Malinowki
@@ -438,7 +438,7 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 
 	# transpose back if needed
 	if transp == 1:
-	    denData = denData.transpose()
+		denData = denData.transpose()
 
 	# [m2,n2] = np.shape(denData)
 	# print("m2 :",m2)
