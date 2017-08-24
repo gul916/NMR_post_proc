@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import math
@@ -8,12 +8,13 @@ from scipy import linalg
 from time import time
 
 
-# svd_tools_resolution_override  =>  
+# svd_tools_resolution_override  =>  default value of override for init()
+# change it to change the default value of override in init()
 ## 0 : default choice (skcuda if available / scipy if not)
 ## 1 : force arrayfire use
 ## 2 : force skcuda use
 ## 3 : force scipy use
-svd_tools_resolution_override = 4
+svd_tools_resolution_override = 0
 
 arrayfireOK = False
 skcudaOK = False
@@ -21,23 +22,6 @@ scipyOK = False
 initCalled = False
 
 modulesCheck = [svd_tools_resolution_override,arrayfireOK,skcudaOK,scipyOK,initCalled]
-
-'''
-def initTest(override):
-	a=1
-	b=2
-	c=6
-	modulesCheck = [0,a,b,c]
-
-def initTest2(override):
-	a=1
-	b=2
-	c=6
-	modulesCheck[0] = 0
-	modulesCheck[1] = a
-	modulesCheck[2] = b
-	modulesCheck[3] = c
-'''
 
 
 def import_arrayfire():
@@ -112,14 +96,7 @@ def init(override=svd_tools_resolution_override):
 		print('  Forcing load of module scipy')
 		scipyOK = import_scipy()
 
-	else:
-
-		if override != 0:
-			print("\nInvalid value specified for override ("\
-				,override,"). Correct values : 0 1 2 3")
-			print("Using default choice (0) :")
-			override = 0
-
+	elif override == 0:
 		# default choice
 
 		arrayfireOK = import_arrayfire()
@@ -129,6 +106,10 @@ def init(override=svd_tools_resolution_override):
 
 			if (not skcudaOK):
 				scipyOK = import_scipy()
+
+	else:
+		print("\nInvalid value specified for override ("\
+			,override,"). Correct values : 0 1 2 3")
 
 	initCalled = True
 
@@ -160,6 +141,18 @@ def svd_tools_resolution():
 	# print("scipyOK : ",scipyOK)
 	if not initCalled:
 		raise ImportError("init() function not called")
+	if override == 0:
+		if arrayfireOK:
+			choice = 'arrayfire'
+			print("Using methods from module : arrayfire")
+		elif skcudaOK:
+			choice = 'skcuda'
+			print("Using methods from module : skcuda")
+		elif scipyOK:
+			choice = 'scipy'
+			print("Using methods from module : scipy")
+		else:
+			raise ImportError('No SVD module available.')
 	if override == 1:
 		if arrayfireOK:
 			choice = 'arrayfire'
@@ -179,17 +172,11 @@ def svd_tools_resolution():
 		else:
 			raise ImportError('Selected SVD module (scipy) not found.')
 	else:
-		if arrayfireOK:
-			choice = 'arrayfire'
-			print("Using methods from module : arrayfire")
-		elif skcudaOK:
-			choice = 'skcuda'
-			print("Using methods from module : skcuda")
-		elif scipyOK:
-			choice = 'scipy'
-			print("Using methods from module : scipy")
-		else:
-			raise ImportError('No SVD module available.')
+		errorMsg = "Specified override value incorrect ("
+		errorMsg += str(override)
+		errorMsg += "). Correct values : 0 1 2 3"
+		raise ImportError(errorMsg)
+		
 
 	return choice
 

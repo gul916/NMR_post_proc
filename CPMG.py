@@ -10,7 +10,6 @@ File started from CPMG_PAG_2017-08-11
 ### PARAMETERS
 ###----------------------------------------------------------------------------
 
-#import arrayfire as af
 import math
 import matplotlib.pyplot as plt
 import numpy as np
