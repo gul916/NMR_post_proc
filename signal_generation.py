@@ -29,8 +29,8 @@ if firstDec == True:
 # paramètres :
 dw = 24e-6					# temps entre 2 prises de points
 dw2 = 2*dw
-nbPt = 16384				# nb de pts complexes  ( nbPt == td/2 )
-aquiT = (nbPt-1)*dw2		# temps acquisition total : aquiT = (nbPt-1)*dw2
+td = 16384				# nb de pts complexes  ( td == td/2 )
+aquiT = (td-1)*dw2		# temps acquisition total : aquiT = (td-1)*dw2
 de = 96e-6					# temps de non-acquisition au début
 # de = 0
 
@@ -46,7 +46,7 @@ nbPtHalfEcho = int(halfEcho / dw2)	# avec arrondi
 #nbPtHalfEcho = 1 + (halfEcho / (dw2))		# sans arrondi ici
 nbPtSignal = nbPtHalfEcho * nbHalfEcho
 #nbPtHalfEcho_via_nbPtSignal = nbPtSignal/(2*nbEcho+1)
-missingPts = nbPt-nbPtSignal
+missingPts = td-nbPtSignal
 nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
 
 
@@ -79,7 +79,7 @@ nu2 = -2500
 
 # print("\n Valeurs passées en paramètres :\n")
 # print("\tdw =", dw)
-# print("\tnbPt =", nbPt)
+# print("\tnbPt =", td)
 # print("\taquiT =", aquiT)
 # print("\tde =", de)
 
@@ -141,7 +141,7 @@ def signal_generation():
 
 
 	# affichage de la matrice A (signal entier) avant ajout du bruit
-	timeT = np.linspace(0,dureeT,nbPt)
+	timeT = np.linspace(0,dureeT,td)
 
 	plt.ion()					# interactive mode on
 	fig1 = plt.figure()
@@ -151,7 +151,7 @@ def signal_generation():
 	ax1.set_title("FID without noise")
 	ax1.plot(timeT[:],A[:].real)
 
-	nbPtFreq = nbPt*4
+	nbPtFreq = td*4
 	freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 	ax2 = fig1.add_subplot(412)
 	ax2.set_title("SPC without noise")
@@ -160,7 +160,7 @@ def signal_generation():
 
 
 	# noise generation 
-	num_samples = nbPt
+	num_samples = td
 	noise = np.random.normal(mean, std, size=num_samples)
 
 	# ajout du bruit au signal
@@ -168,7 +168,7 @@ def signal_generation():
 
 
 	## affichage de la matrice A (signal entier) après ajout du bruit
-	#timeT = np.linspace(0,dureeT,nbPt)
+	#timeT = np.linspace(0,dureeT,td)
 	#ax3 = fig1.add_subplot(413)
 	#ax3.set_title("FID with noise and dead time")
 	#ax3.plot(timeT[:],A[:].real)
@@ -184,16 +184,18 @@ def signal_generation():
 
 	A = A[nbPtDeadTime:]
 
+	tdCorr = td-nbPtDeadTime
+
 
 	# affichage de la matrice A (signal entier) après prise en compte du dead time
-	timeT = np.linspace(0,dureeT,nbPt-nbPtDeadTime)
+	timeT = np.linspace(0,dureeT,tdCorr)
 	ax3 = fig1.add_subplot(413)
 	ax3.set_title("FID with noise and dead time")
 	ax3.plot(timeT[:],A[:].real)
 
 
 	# affichage du spectre
-	nbPtFreq = nbPt*4
+	nbPtFreq = tdCorr*4
 	freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 	ax4 = fig1.add_subplot(414)
 	ax4.set_title("SPC with noise and dead time")
@@ -204,7 +206,7 @@ def signal_generation():
 
 	generatedSignal = sig.Signal()
 	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
-	generatedSignal.setValues_topspin(dw,nbPt,de)
+	generatedSignal.setValues_topspin(dw,tdCorr,de)
 	generatedSignal.setData(A)
 
 	return generatedSignal

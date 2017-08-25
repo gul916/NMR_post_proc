@@ -191,7 +191,7 @@ def svd_preliminary_operations(setSVDTools):
 		#	# see https://github.com/arrayfire/arrayfire-python/issues/134
 		af.set_backend('cpu')
 		print("\nUsing arrayfire version :")
-		af.info()
+		print(af.info_str())
 	elif setSVDTools == 'skcuda':
 		culinalg.init()
 

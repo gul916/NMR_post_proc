@@ -17,7 +17,7 @@ class Signal:
 
 		self._dw = 0
 		self._dw2 = 0
-		self._nbPt = 0
+		self._td = 0
 		self._aquiT = 0
 		self._de = 0
 
@@ -97,21 +97,21 @@ class Signal:
 
 	
 	def _get_nbPt(self):
-		return self._nbPt
+		return self._td
 	def _set_nbPt(self,newnbPt):
 		if not isinstance(newnbPt, int):
-			raise ValueError("nbPt must be of type int")
+			raise ValueError("td must be of type int")
 		if newnbPt <= 0:
 			raise ValueError("dw must be > 0")
-		self._nbPt = newnbPt
-	nbPt = property(_get_nbPt,_set_nbPt)
+		self._td = newnbPt
+	td = property(_get_nbPt,_set_nbPt)
 	
 
 	def _get_aquiT(self):
 		return self._aquiT
 	aquiT = property(_get_aquiT)
 	def set_aquiT(self):
-		self._aquiT = (self._nbPt -1)*self._dw2
+		self._aquiT = (self._td -1)*self._dw2
 
 
 	def _get_de(self):
@@ -155,7 +155,7 @@ class Signal:
 		return self._missingPts
 	missingPts = property(_get_missingPts)
 	def set_missingPts(self):
-		self._missingPts = self._nbPt - self._nbPtSignal
+		self._missingPts = self._td - self._nbPtSignal
 
 
 	def _get_nbPtDeadTime(self):
@@ -184,7 +184,7 @@ class Signal:
 	def setValues_topspin(self,newdw,newnbPt,newde):
 		try:
 			self.dw = newdw
-			self.nbPt = newnbPt
+			self.td = newnbPt
 			self.de = newde
 			self.set_aquiT()
 			self.set_dureeT()

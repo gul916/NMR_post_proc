@@ -35,8 +35,8 @@ def signal_processing(processedSig):
 	# paramètres :
 	dw = processedSig.dw					# temps entre 2 prises de points
 	dw2 = processedSig.dw2
-	nbPt = processedSig.nbPt				# nb de pts complexes  ( nbPt == td/2 )
-	aquiT = processedSig.aquiT	# temps acquisition total : aquiT = (nbPt-1)*dw2
+	td = processedSig.td				# nb de pts complexes  ( td == td/2 )
+	aquiT = processedSig.aquiT	# temps acquisition total : aquiT = (td-1)*dw2
 	de = processedSig.de					# temps de non-acquisition au début
 	# de = 0
 
@@ -56,7 +56,7 @@ def signal_processing(processedSig):
 	# Method 1: on full 1D with echoes --> very long
 	# Method 2: on full 2D of stacked echoes --> very fast
 	# Method 3: on separated echoes --> fast
-	SVD_method = 2
+	SVD_method = 0
 
 	#if nbPtSignal <= 8192:
 	#	SVD_method = 1
@@ -82,7 +82,7 @@ def signal_processing(processedSig):
 
 	print("\n Valeurs passées en paramètres :\n")
 	print("\tdw =", dw)
-	print("\tnbPt =", nbPt)
+	print("\tnbPt =", td)
 	print("\taquiT =", aquiT)
 	print("\tde =", de)
 
@@ -105,12 +105,12 @@ def signal_processing(processedSig):
 	### Exploitation du signal
 	###----------------------------------------------------------------------------
 
-	timeT = np.linspace(0,dureeT,nbPt-nbPtDeadTime)
+	timeT = np.linspace(0,dureeT,td)
 	fig2 = plt.figure()
 	fig2.suptitle("CPMG NMR signal processing", fontsize=16)
 	ax1 = fig2.add_subplot(411)
 	ax1.set_title("Raw FID !!! Different scales !!!")
-	ax1.plot(timeT[:],A[:].real)
+	ax1.plot(A[:].real)
 
 	# ajout de points à zero pour compenser le dead time
 	zerosToAdd = np.zeros((nbPtDeadTime,), dtype=np.complex)
