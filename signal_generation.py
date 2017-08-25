@@ -14,7 +14,7 @@ File started from CPMG_PAG_2017-08-11
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-import signaltoto as sig
+import signalTopspin as sig
 
 # demandés à l'utilisateur :
 fullEcho = 10e-3
@@ -101,7 +101,7 @@ nu2 = -2500
 ### SYNTHESE DE SIGNAL RMN
 ###----------------------------------------------------------------------------
 
-def signalCreation():
+def signal_generation():
 	desc = firstDec
 	A = np.array([])
 
@@ -211,7 +211,7 @@ def signalCreation():
 
 
 if __name__ == "__main__":
-	s1 = signalCreation()
+	s1 = signal_generation()
 	print('s1.dw : ', s1.dw)
 	print('s1.data : ', s1.data)
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
