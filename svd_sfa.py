@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+@authors: Pierre-Aymeric GILLES & Guillaume LAURENT
+"""
+
 import math
 import numpy as np
-import csv
 from scipy import linalg
 from time import time
 
@@ -122,7 +125,7 @@ def init(override=svd_tools_resolution_override):
 
 
 ###----------------------------------------------------------------------------
-### SVD METHODS (WIP)
+### SVD METHODS
 ###----------------------------------------------------------------------------
 
 
@@ -496,7 +499,7 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 
 					nbPtSignal = nbPtHalfEcho * nbHalfEcho
 					row = math.ceil(nbPtSignal / 2)
-					col = nbPtSignal - row + 1
+#					col = nbPtSignal - row + 1
 
 					data_rec = np.empty([nbPtSignal],dtype='complex64')
 
@@ -524,7 +527,7 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 					nbPtFullEcho = 2*nbPtHalfEcho
 					nbFullEchoTotal = int((nbHalfEcho+1)/2)
 					row = math.ceil(nbPtFullEcho / 2)
-					col = nbPtFullEcho - row + 1
+#					col = nbPtFullEcho - row + 1
 
 					data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
 					
@@ -554,13 +557,12 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 
 
 ###----------------------------------------------------------------------------
-### 							TEST ZONE
-### 		Beware for the test zone is messy and full of bugs
+### When this file is executed directly
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
-	#A = np.genfromtxt('/home/pagilles/fichiersTaf/CPMG/code/NMR_post_proc-master/toeplitz.csv',delimiter=',',dtype='complex128')
+	A = np.genfromtxt('./toeplitz.csv',delimiter=',',dtype='complex128')
 	#print(A)
 
 	#svd_thres(A,'SL')
@@ -592,3 +594,4 @@ if __name__ == "__main__":
 	print('modulesCheck :',modulesCheck)
 	print("\n------------------------------------------------------------------------\n")
 
+	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

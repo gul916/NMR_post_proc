@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+@authors: Pierre-Aymeric GILLES & Guillaume LAURENT
+"""
+
 import numpy as np
 
 class Signal:

@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 """
-File started from CPMG_PAG_2017-08-11
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
@@ -10,7 +9,6 @@ File started from CPMG_PAG_2017-08-11
 ### PARAMETERS
 ###----------------------------------------------------------------------------
 
-import math
 import matplotlib.pyplot as plt
 import numpy as np
 

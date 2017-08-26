@@ -2,19 +2,16 @@
 # -*- coding: utf-8 -*-
 
 """
-File started from CPMG_PAG_2017-08-11
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
+import matplotlib.pyplot as plt
+import numpy as np
+import signalTopspin as sig
 
 ###----------------------------------------------------------------------------
 ### PARAMETERS
 ###----------------------------------------------------------------------------
-
-import math
-import matplotlib.pyplot as plt
-import numpy as np
-import signalTopspin as sig
 
 # demandés à l'utilisateur :
 fullEcho = 10e-3
@@ -161,7 +158,8 @@ def signal_generation():
 
 	# noise generation 
 	num_samples = td
-	noise = np.random.normal(mean, std, size=num_samples)
+	noise = np.random.normal(mean, std, size=num_samples) + \
+		1j*np.random.normal(mean, std, size=num_samples)
 
 	# ajout du bruit au signal
 	A+=noise
@@ -216,4 +214,8 @@ if __name__ == "__main__":
 	s1 = signal_generation()
 	print('s1.dw : ', s1.dw)
 	print('s1.data : ', s1.data)
+	
+	np.savetxt('CPMG_FID.csv', np.transpose([s1.data[:].real, s1.data[:].imag]),\
+			delimiter='\t', header='sep=\t', comments='')
+	
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
