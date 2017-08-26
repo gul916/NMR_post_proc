@@ -13,39 +13,16 @@ import signalTopspin as sig
 ### PARAMETERS
 ###----------------------------------------------------------------------------
 
-# demandés à l'utilisateur :
+# Asked to the user
 fullEcho = 10e-3
 nbEcho = 20					# 38 for less than 8k points, 76 for more
 firstDec = True
 
-halfEcho = fullEcho / 2
-nbHalfEcho = (nbEcho * 2)
-if firstDec == True:
-	nbHalfEcho += 1
-
-# paramètres :
-dw = 24e-6					# temps entre 2 prises de points
-dw2 = 2*dw
-td = 16384				# nb de pts complexes  ( td == td/2 )
-aquiT = (td-1)*dw2		# temps acquisition total : aquiT = (td-1)*dw2
-de = 96e-6					# temps de non-acquisition au début
+# From Topspin interface
+dw = 24e-6					# dwell time between two points
+td = 32768					# nb of real points + nb of imag points
+de = 96e-6					# dead time before signal acquisition
 # de = 0
-
-# noise generation 
-mean = 0
-std = 0.3
-
-# calculés :
-dureeT = aquiT + de
-dureeSignal = nbHalfEcho * halfEcho
-#nbPtSignal_via_dureeSignal = np.rint(1 + (dureeSignal / (dw2)))
-nbPtHalfEcho = int(halfEcho / dw2)	# avec arrondi
-#nbPtHalfEcho = 1 + (halfEcho / (dw2))		# sans arrondi ici
-nbPtSignal = nbPtHalfEcho * nbHalfEcho
-#nbPtHalfEcho_via_nbPtSignal = nbPtSignal/(2*nbEcho+1)
-missingPts = td-nbPtSignal
-nbPtDeadTime = int(de / dw2)	# nb de pts à 0 au début
-
 
 # 1st frequency
 t21 = 500e-3
@@ -56,6 +33,30 @@ nu1 = 1750
 t22 = 100e-3
 t22star = 0.5e-3
 nu2 = -2500
+
+# Simulation of noise
+mean = 0
+std = 0.1
+
+# Calculated
+halfEcho = fullEcho / 2
+nbHalfEcho = (nbEcho * 2)
+if firstDec == True:
+	nbHalfEcho += 1
+
+dw2 = 2*dw							# 1 real + 1 imag points are needed to have a complex point
+td2 = int(td/2)					# nb of complex points
+acquiT = (td2-1)*dw2				# total acquisition time, starts at 0
+dureeSignal = nbHalfEcho * halfEcho
+nbPtHalfEcho = int(halfEcho / dw2)
+nbPtSignal = int(nbPtHalfEcho * nbHalfEcho)
+missingPts = int(td2-nbPtSignal)		# Number of points after last echo
+nbPtDeadTime = int(de / dw2)	# Number of point during dead time
+
+# Axes
+timeT = np.linspace(0,acquiT,td2)
+nbPtFreq = int(td2*4)			# zero filling
+freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 
 
 
@@ -77,7 +78,7 @@ nu2 = -2500
 # print("\n Valeurs passées en paramètres :\n")
 # print("\tdw =", dw)
 # print("\tnbPt =", td)
-# print("\taquiT =", aquiT)
+# print("\taquiT =", acquiT)
 # print("\tde =", de)
 
 # print("\n Valeurs calculées :\n")
@@ -100,7 +101,7 @@ nu2 = -2500
 
 def signal_generation():
 	desc = firstDec
-	A = np.array([])
+	Aref = np.array([])
 
 	print("\n------------------------------------------------------------------------")
 	# print("\n 1er point de chaque demi echo à la creation : ")
@@ -129,82 +130,77 @@ def signal_generation():
 
 		# print("\t1er elem du demi echo", i ," =", yi[0])
 
-		A = np.concatenate((A[:],yi[:]))
+		Aref = np.concatenate((Aref[:],yi[:]))
 
-	#print("\tA.size =",A.size)
-	end = np.zeros((missingPts,), dtype=np.complex)
-	A = np.concatenate((A[:],end[:]))
-	#print("\tA.size =",A.size)
+	#print("\tAref.size =",Aref.size)
+	end = np.zeros(missingPts, dtype=np.complex)
+	Aref = np.concatenate((Aref[:],end[:]))
+	#print("\tAref.size =",Aref.size)
 
-
-	# affichage de la matrice A (signal entier) avant ajout du bruit
-	timeT = np.linspace(0,dureeT,td)
-
+	# Reference signal display
 	plt.ion()					# interactive mode on
 	fig1 = plt.figure()
 	fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
 
 	ax1 = fig1.add_subplot(411)
-	ax1.set_title("FID without noise")
-	ax1.plot(timeT[:],A[:].real)
+	ax1.set_title("Reference FID")
+	ax1.plot(timeT[:],Aref[:].real)
+	ax1.plot(timeT[:],Aref[:].imag)
 
-	nbPtFreq = td*4
-	freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
+	A = Aref.copy()		# Avoid reference signal corruption
+
+
+
+	# Suppression of points during dead time 
+	end = np.zeros(nbPtDeadTime, dtype=np.complex)
+	A = np.concatenate((A[nbPtDeadTime:],end[:]))
+
+	# Signal display after dead time suppression
 	ax2 = fig1.add_subplot(412)
-	ax2.set_title("SPC without noise")
-	ax2.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:], nbPtFreq)).real)
-	ax2.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:nbPtHalfEcho]*nbEcho, nbPtFreq)).real)
+	ax2.set_title("FID with dead time")
+	ax2.plot(timeT[:],A[:].real)
+	ax2.plot(timeT[:],A[:].imag)
 
 
-	# noise generation 
-	num_samples = td
-	noise = np.random.normal(mean, std, size=num_samples) + \
-		1j*np.random.normal(mean, std, size=num_samples)
 
-	# ajout du bruit au signal
+	# Adding noise
+	noise = np.random.normal(mean, std, td2) + 1j*np.random.normal(mean, std, td2)
 	A+=noise
 
-
-	## affichage de la matrice A (signal entier) après ajout du bruit
-	#timeT = np.linspace(0,dureeT,td)
-	#ax3 = fig1.add_subplot(413)
-	#ax3.set_title("FID with noise and dead time")
-	#ax3.plot(timeT[:],A[:].real)
-
-
-	# print("\n 1er point de chaque demi echo dans la matrice A (avec bruit) : ")
-	# for i in range (0, nbHalfEcho):
-	# 	pt = i*nbPtHalfEcho
-	# 	print("\t1er elem du demi echo", i ," (point", pt, ") =", A[pt])
-
-
-	# suppression de points pour prendre en compte le dead time
-
-	A = A[nbPtDeadTime:]
-
-	tdCorr = td-nbPtDeadTime
-
-
-	# affichage de la matrice A (signal entier) après prise en compte du dead time
-	timeT = np.linspace(0,dureeT,tdCorr)
+	# Signal display after dead time suppression and noise addition
 	ax3 = fig1.add_subplot(413)
-	ax3.set_title("FID with noise and dead time")
+	ax3.set_title("FID with dead time and noise")
 	ax3.plot(timeT[:],A[:].real)
+	ax3.plot(timeT[:],A[:].imag)
 
 
-	# affichage du spectre
-	nbPtFreq = tdCorr*4
-	freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
+
+	# Spectra display
+	ArefSpc = Aref.copy()				# Avoid reference FID corruption
+	ASpc = A.copy()						# Avoid noisy FID corruption
+
+	if firstDec == True:
+		ArefSpc = ArefSpc[:nbPtHalfEcho] * nbHalfEcho
+	else:
+		ArefSpc = ArefSpc[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
+		
+	ArefSpc[0] *= 0.5						# FFT artefact correction
+	ASpc[0] *= 0.5
+	ArefSpc = np.fft.fftshift(np.fft.fft(ArefSpc[:], nbPtFreq))
+	ASpc = np.fft.fftshift(np.fft.fft(ASpc[:], nbPtFreq))	# FFT with zero filling
+	
 	ax4 = fig1.add_subplot(414)
-	ax4.set_title("SPC with noise and dead time")
-	ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:], nbPtFreq)).real)
-	ax4.plot(freq[:], np.fft.fftshift(np.fft.fft(A[:nbPtHalfEcho]*nbEcho, nbPtFreq)).real)
+	ax4.set_title("SPC with dead time and noise and reference SPC")
+	ax4.invert_xaxis()
+	ax4.plot(freq[:], ASpc.real)
+	ax4.plot(freq[:], ArefSpc.real)
+
 	fig1.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
 	fig1.show()					# Display figure
 
 	generatedSignal = sig.Signal()
 	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
-	generatedSignal.setValues_topspin(dw,tdCorr,de)
+	generatedSignal.setValues_topspin(dw,td,de)
 	generatedSignal.setData(A)
 
 	return generatedSignal

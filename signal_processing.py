@@ -183,11 +183,11 @@ def signal_processing(processedSig):
 
 	for i in range (0, nbFullEchoTotal):
 		#for j in range (0, nbPtFullEcho):
-			#echos2D[i][j]+=2*i
-		ax1.plot(timeFullEcho[:],(echos2D[i][0:nbPtFullEcho]).real)
+			#echos2D[i, j]+=2*i
+		ax1.plot(timeFullEcho[:],(echos2D[i, 0:nbPtFullEcho]).real)
 
-		# print("\t1er elem du demi echo", 2*i ," =", echos2D[i][0])
-		# print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i][nbPtHalfEcho])
+		# print("\t1er elem du demi echo", 2*i ," =", echos2D[i, 0])
+		# print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i, nbPtHalfEcho])
 
 
 	'''
@@ -196,7 +196,7 @@ def signal_processing(processedSig):
 	sommeTempo = np.zeros((nbPtFullEcho,nbFullEchoTotal), dtype=np.complex)
 	for i in range (0, nbFullEchoTotal):
 		for j in range (0, nbPtFullEcho):
-			sommeTempo[j] += echos2D[i][j]
+			sommeTempo[j] += echos2D[i, j]
 	plt.figure()
 	plt.plot(timeFullEcho[:],sommeTempo[0:nbPtFullEcho].real)
 	plt.show() # affiche la figure a l'ecran
@@ -210,7 +210,7 @@ def signal_processing(processedSig):
 		ax2 = fig3.add_subplot(412)
 		ax2.set_title("FID after SVD on echoes matrix")
 		for i in range (0, nbFullEchoTotal):
-			ax2.plot(timeFullEcho[:],(echos2D[i][0:nbPtFullEcho]).real)
+			ax2.plot(timeFullEcho[:],(echos2D[i, 0:nbPtFullEcho]).real)
 
 
 
@@ -221,7 +221,7 @@ def signal_processing(processedSig):
 		ax2 = fig3.add_subplot(412)
 		ax2.set_title("FID after SVD on Toeplitz matrix of echoes")
 		for i in range (0, nbFullEchoTotal):
-			ax2.plot(timeFullEcho[:],(echos2D[i][:]).real)
+			ax2.plot(timeFullEcho[:],(echos2D[i, :]).real)
 		
 
 	# prediction lineaire
@@ -230,8 +230,8 @@ def signal_processing(processedSig):
 	# somme ponderee -> calcul de Imax
 	Imax = np.empty([nbFullEchoTotal])
 	for i in range (0, nbFullEchoTotal):
-		#Imax = np.amax((echos2D[i][:]).real)
-		#echos2D[i][0:nbPtFullEcho]*=Imax
+		#Imax = np.amax((echos2D[i, :]).real)
+		#echos2D[i, 0:nbPtFullEcho]*=Imax
 		Imax[i] = np.amax((echos2D[i,:]).real)
 
 
@@ -239,30 +239,30 @@ def signal_processing(processedSig):
 
 
 	# fftshift => inversion des halfEcho 2 à 2
-	echosFFTSHIFT = np.fft.fftshift(echos2D[0:nbFullEchoTotal][0:nbPtFullEcho],axes=1)
-	echosFFTSHIFT[0][0]*=0.5		# permet de corriger l'artefact due à la FFT
+	echosFFTSHIFT = np.fft.fftshift(echos2D[0:nbFullEchoTotal, 0:nbPtFullEcho],axes=1)
+	echosFFTSHIFT[0, 0]*=0.5		# permet de corriger l'artefact due à la FFT
 	echosFFT = np.fft.fftshift(np.fft.fft(echosFFTSHIFT[:,:],axis=1),axes=1)
 
 	ax3 = fig3.add_subplot(413)
 	ax3.set_title("SPC after SVD")
 	for i in range (0, nbFullEchoTotal):
-		ax3.plot(timeFullEcho[:],(echosFFT[i][0:nbPtFullEcho]).real)
+		ax3.plot(timeFullEcho[:],(echosFFT[i, 0:nbPtFullEcho]).real)
 
 
 	# ponderation par Imax
 	for i in range (0, nbFullEchoTotal):
-		echosFFT[i][0:nbPtFullEcho]*=Imax[i]
+		echosFFT[i, 0:nbPtFullEcho]*=Imax[i]
 
 	# affichage du spectre de la 1ere decroissance pour comparaison avec la somme
 	timeFullEcho = np.linspace(0,fullEcho-dw2,nbPtFullEcho)
-	#plt.plot(timeFullEcho[:],echosFFT[0][0:nbPtFullEcho].real)
+	#plt.plot(timeFullEcho[:],echosFFT[0, 0:nbPtFullEcho].real)
 
 
 	# somme des echos (spectrale)
 	sommeSpect = np.zeros((nbPtFullEcho*nbFullEchoTotal), dtype=np.complex)
 	for i in range (0, nbFullEchoTotal):
 		for j in range (0, nbPtFullEcho):
-			sommeSpect[j] += echosFFT[i][j]
+			sommeSpect[j] += echosFFT[i, j]
 	ax4 = fig3.add_subplot(414)
 	ax4.set_title("SPC after Imax ponderation and sum")
 	ax4.plot(timeFullEcho[:],sommeSpect[0:nbPtFullEcho].real)
