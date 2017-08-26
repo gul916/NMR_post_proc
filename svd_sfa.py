@@ -6,10 +6,16 @@
 """
 
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg
 from time import time
 
+
+
+###----------------------------------------------------------------------------
+### PARAMETERS
+###----------------------------------------------------------------------------
 
 # svd_tools_resolution_override  =>  default value of override for init()
 # change it to change the default value of override in init()
@@ -19,6 +25,14 @@ from time import time
 ## 3 : force scipy use
 svd_tools_resolution_override = 0
 
+# svdMethod :#
+# 0 : no Singular Value Decomposion (SVD)
+# 1 : SVD applied on 1D data converted to Toeplitz matrix --> very long
+# 2 : SVD applied on 2D data --> very fast
+# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
+svdMethod = 1
+
+#Initialisation
 arrayfireOK = False
 skcudaOK = False
 scipyOK = False
@@ -26,6 +40,11 @@ initCalled = False
 
 modulesCheck = [svd_tools_resolution_override,arrayfireOK,skcudaOK,scipyOK,initCalled]
 
+
+
+###----------------------------------------------------------------------------
+### SVD tools importation
+###----------------------------------------------------------------------------
 
 def import_arrayfire():
 	arrayfireLoad = False
@@ -41,12 +60,13 @@ def import_arrayfire():
 	return arrayfireLoad
 
 
+
 def import_skcuda():
 	skcudaLoad = False
 	try:
 		print('\nLoading module skcuda ...')
 		global gpuarray, culinalg, cudriver
-		import pycuda.autoinit
+		import pycuda.autoinit			# needed
 		import pycuda.driver as cudriver
 		import pycuda.gpuarray as gpuarray
 		import skcuda.linalg as culinalg
@@ -56,6 +76,7 @@ def import_skcuda():
 		skcudaLoad = True
 		print('Module skcuda loaded successfully')
 	return skcudaLoad
+
 
 
 def import_scipy():
@@ -72,7 +93,12 @@ def import_scipy():
 	return scipyLoad
 
 
-def init(override=svd_tools_resolution_override):
+
+###----------------------------------------------------------------------------
+### SVD tools resolution
+###----------------------------------------------------------------------------
+
+def svd_init(override=svd_tools_resolution_override):
 
 	arrayfireOK = False
 	skcudaOK = False
@@ -124,11 +150,6 @@ def init(override=svd_tools_resolution_override):
 
 
 
-###----------------------------------------------------------------------------
-### SVD METHODS
-###----------------------------------------------------------------------------
-
-
 def svd_tools_resolution():
 
 	override = modulesCheck[0]
@@ -143,7 +164,7 @@ def svd_tools_resolution():
 	# print("skcudaOK : ",skcudaOK)
 	# print("scipyOK : ",scipyOK)
 	if not initCalled:
-		raise ImportError("init() function not called")
+		raise ImportError("svd_init() function not called")
 	if override == 0:
 		if arrayfireOK:
 			choice = 'arrayfire'
@@ -197,6 +218,7 @@ def svd_preliminary_operations(setSVDTools):
 		print(af.info_str())
 	elif setSVDTools == 'skcuda':
 		culinalg.init()
+
 
 
 ###----------------------------------------------------------------------------
@@ -265,9 +287,10 @@ def indMethod(s,m,n):
 		re[i] = np.sqrt(sev[i] / (m * (n-i-1)))		# see eq. 4.44
 		ind[i] = re[i] / (n-i-1)**2					# see eq. 4.63
 
-
-	nval = np.argmin(ind)+1
-
+	nval = np.argmin(ind)
+#	print('\nind[nval]\n', ind[nval])
+#	print('\nind[nval-2:nval+3]\n', ind[nval-2:nval+3])
+	
 	null = np.array([None])
 	re = np.concatenate((re[:],null[:]))
 	ind = np.concatenate((ind[:],null[:]))
@@ -283,8 +306,6 @@ def indMethod(s,m,n):
 
 	return (nval,sdf,ev,sev,t)
 
-	# disp(['IND function indicates ', int2str(nval), ' significant factors.'])
-	# disp(['The real error (RE) is +/-', num2str(re(nval)), '.'])
 
 
 ## Significance Level SL
@@ -319,20 +340,15 @@ def slMethod(s,m,n,max_err):
 		s1 = 2 * s1
 		if s1 < 1e-2:
 			s1 = 0
-		t[j][5] = s1
-	t[n-1][5] = None
+		t[j, 5] = s1
+	t[n-1, 5] = None
 
-	nval = (np.nonzero((t[:,5]) < max_err))[0]
-	if (nval.size==0):
-		nval = 0
-	else:
-		nval = nval[-1]+1
-	
+	nval = np.argmax((t[:n-1,5]) > max_err) - 1
+#	print('\nt[nval,5]\n', t[nval,5])
+#	print('\nt[nval-2:nval+3,5]\n', t[nval-2:nval+3,5])
+
 	return nval
 
-	# disp(['SL function indicates ', int2str(nval), ' significant factors.'])
-	# if nval ~= 0
-	# disp(['The real error (RE) is +/-', num2str(re(nval)), '.'])
 
 
 ###----------------------------------------------------------------------------
@@ -375,10 +391,10 @@ def svd_reconstruction(U, s_gpu, Vh, thres, choice):
 	return mat_rec
 
 
+
 ###----------------------------------------------------------------------------
 ### SVD THRESHOLD
 ###----------------------------------------------------------------------------
-
 
 def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 	'''
@@ -421,20 +437,10 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 	if (thresMethod == 'IND'):
 		nval = indMethod(scpu,m,n)[0]
 	else:
-		#if (thresMethod != 'SL'):
-		#	print("Invalid threshold method specified ! Using default method (SL)")
 		nval = slMethod(scpu,m,n,max_err)
 
-	# try:
-	# 	if nval <= 3:
-	# 		raise ValueError
-	# except ValueError:
-	# 	print("No singular value detected, aborting SVD")
-	# 	return data, nval
-
-	if nval <= 0:
+	if nval < 0:
 		raise ValueError
-
 
 	# reconstruction
 	denData = svd_reconstruction(u,sgpu,v,nval,svdTools)
@@ -450,27 +456,32 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 	return denData, nval
 
 
+
 ###----------------------------------------------------------------------------
 ### MAIN SVD METHOD
 ###----------------------------------------------------------------------------
 
+# svdMethod :#
+# 0 : no Singular Value Decomposion (SVD)
+# 1 : SVD applied on 1D data converted to Toeplitz matrix --> very long
+# 2 : SVD applied on 2D data --> very fast
+# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
 
-# svdMethod :
-#
-## 1 : Singular Value Decompostion (SVD) on Toeplitz matrix
-##		=> on full 1D with echoes --> very long
-## 2 : Singular Value Decompostion (SVD) on echo matrix
-##		=> on full 2D of stacked echoes --> very fast
-## 3 : Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
-##		=> on separated echoes --> fast
-#
-
-def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
+def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 	# default values
 	## returned if for some reason svd isn't performed
 	processedData = data
-	if svdMethod not in [1,2,3]:
+	
+	if svdMethod == 0:
+		print("\nSVD method = ",svdMethod," SVD not performed.")
+	elif svdMethod not in [1,2,3]:
 		print("\nInvalid SVD method specified (",svdMethod,"). SVD not performed.")
+	elif (data.ndim == 1) and (svdMethod in [2,3]):
+		print("\nSVD method ",svdMethod," can't be applied to 1D data. SVD not performed.")
+	elif (data.ndim == 2) and (svdMethod == 1):
+		print("\nSVD method ",svdMethod," can't be applied to 2D data. SVD not performed.")
+	elif (data.ndim > 2):
+		print("\nSVD not yet tested on high dimensionnal data. SVD not performed.")
 	else:
 		try:
 			print("\n------------------------------------------------------------------------")
@@ -487,72 +498,64 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 			print("svdMethod :",svdMethod)
 			print("\n------------------------------------------------------------------------\n")
 			
-			#print('data[0,0] = ',data[0])
 			try:
-
 				t_0 = time()
 				data64 = data.astype('complex64')		# decrease SVD computation time
 
 				if svdMethod == 1:
 					# Singular Value Decompostion (SVD) on Toeplitz matrix
-					print("SVD on Toeplitz matrix in progress. Please be patient.")
-
-					nbPtSignal = nbPtHalfEcho * nbHalfEcho
+					nbPtSignal = data64.size
 					row = math.ceil(nbPtSignal / 2)
 #					col = nbPtSignal - row + 1
 
-					data_rec = np.empty([nbPtSignal],dtype='complex64')
-
 					mat = linalg.toeplitz(data64[row-1::-1], data64[row-1::1])
+					data_rec = np.empty([nbPtSignal],dtype='complex64')
+					
+					print("SVD on 1D data converted to Toeplitz matrix in progress.")
+					print("Please be patient.")
 					mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
 					for i in range (0, nbPtSignal):
 						data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
 
 					print("thres = ",thres)
 					
-
 				elif svdMethod == 2:
 					# Singular Value Decompostion (SVD) on echo matrix
-					print("SVD on echo matrix in progress. Please be patient.")
+					print("SVD on 2D data in progress. Please be patient.")
 
 					data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
 
 					print("thres = ",thres)
 
-
 				elif svdMethod == 3:
 					# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
-					print("SVD on Toeplitz matrix of echoes in progress. Please be patient.")
+					print("SVD on slices of 2D data converted to Toeplitz matrix in progress.")
+					print("Please be patient.")
 
-					nbPtFullEcho = 2*nbPtHalfEcho
-					nbFullEchoTotal = int((nbHalfEcho+1)/2)
-					row = math.ceil(nbPtFullEcho / 2)
-#					col = nbPtFullEcho - row + 1
+					nslices, nbPtSlice = data64.shape
+					row = math.ceil(nbPtSlice / 2)
+#					col = nbPtSlice - row + 1
 
-					data_rec = np.empty([nbFullEchoTotal, nbPtFullEcho],dtype='complex64')
+					data_rec = np.empty([nslices, nbPtSlice],dtype='complex64')
 					
-					for i in range (0, nbFullEchoTotal):
+					for i in range (0, nslices):
 						mat = linalg.toeplitz(data64[i,row-1::-1], data64[i,row-1::1])
 						mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
 						print("thres = ",thres)
-						for j in range (0, nbPtFullEcho):
+						for j in range (0, nbPtSlice):
 							data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
-
 				
-				processedData = data_rec[:][:].astype('complex128')	# back to double precision
-				t_2 = time()
-				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_2 - t_0))
+				processedData = data_rec.astype('complex128')	# back to double precision
+				t_1 = time()
+				print("Decomposition + Reconstruction time:\t\t{0:8.2f}s".format(t_1 - t_0))
 				print("\n------------------------------------------------------------------------\n")
 			
-			except ValueError:	# nval <= 0 dans svd_thres
+			except ValueError:	# nval < 0 dans svd_thres
 				print("No singular value detected, aborting SVD")
 				print("\n------------------------------------------------------------------------\n")
 				processedData = data
 
-			#print('processedData[0,0] = ',processedData[0])
-	
 	return processedData
-
 
 
 
@@ -561,37 +564,28 @@ def svd(data,nbHalfEcho,nbPtHalfEcho,svdMethod,thresMethod='SL',max_err=5):
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
-	A = np.genfromtxt('./toeplitz.csv',delimiter=',',dtype='complex128')
-	#print(A)
-
-	#svd_thres(A,'SL')
-
-	#newA, threshold = svd(A,1)
-	#print("threshold value : ", threshold)
-	#input('\nPress Any Key To Exit') # have the graphs stay displayed even when launched from linux terminal
-
-	print("\n------------------------------------------------------------------------\n")
-	print('arrayfireOK :',arrayfireOK)
-	print('skcudaOK :',skcudaOK)
-	print('scipyOK :',scipyOK)
-	print('svd_tools_resolution_override :',svd_tools_resolution_override)
-	print('modulesCheck :',modulesCheck)
 	
-	print()
-	init()
-	print('svd_tools_resolution_override :',svd_tools_resolution_override)
-	print('modulesCheck :',modulesCheck)
+	svd_init()
+
+	Amax = 4096
+	A = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
+	A = A[:Amax,0] + 1j*A[:Amax,1]
 	
-	print()
-	init(2)
-	print('svd_tools_resolution_override :',svd_tools_resolution_override)
-	print('modulesCheck :',modulesCheck)
+	newA = svd(A,svdMethod)
+	
+	plt.ion()					# interactive mode on
+	fig = plt.figure()
+	fig.suptitle("SVD processing", fontsize=16)
 
-	print()
-	init(3)
-	print('svd_tools_resolution_override :',svd_tools_resolution_override)
-	print('modulesCheck :',modulesCheck)
-	print("\n------------------------------------------------------------------------\n")
+	ax1 = fig.add_subplot(211)
+	ax1.set_title("Raw FID")
+	ax1.plot(A[:].real)
 
+	ax2 = fig.add_subplot(212)
+	ax2.set_title("Denoised FID")
+	ax2.plot(newA[:].real)
+
+	fig.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
+	fig.show()											# Display figure
+	
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

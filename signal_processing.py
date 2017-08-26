@@ -5,10 +5,6 @@
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
-###----------------------------------------------------------------------------
-### PARAMETERS
-###----------------------------------------------------------------------------
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -16,12 +12,16 @@ import numpy as np
 #processedSig = sigG.signalCreation()
 
 import svd_sfa as svd
-svd.init()
+svd.svd_init()
 
 
 def signal_processing(processedSig):
 
 	A = processedSig.data
+
+	###-------------------------------------------------------------------------
+	### PARAMETERS
+	###-------------------------------------------------------------------------
 
 	# demandés à l'utilisateur :
 	firstDec = processedSig.firstDec
@@ -54,7 +54,7 @@ def signal_processing(processedSig):
 	# Method 1: on full 1D with echoes --> very long
 	# Method 2: on full 2D of stacked echoes --> very fast
 	# Method 3: on separated echoes --> fast
-	SVD_method = 0
+	SVD_method = 2
 
 	#if nbPtSignal <= 8192:
 	#	SVD_method = 1

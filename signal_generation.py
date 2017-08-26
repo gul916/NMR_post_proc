@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import signalTopspin as sig
 
+
+
 ###----------------------------------------------------------------------------
 ### PARAMETERS
 ###----------------------------------------------------------------------------
@@ -95,7 +97,7 @@ freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 # print("\nSpecified SVD method :", SVD_method)
 
 
-#%%----------------------------------------------------------------------------
+###----------------------------------------------------------------------------
 ### SYNTHESE DE SIGNAL RMN
 ###----------------------------------------------------------------------------
 
@@ -183,7 +185,7 @@ def signal_generation():
 		ArefSpc = ArefSpc[:nbPtHalfEcho] * nbHalfEcho
 	else:
 		ArefSpc = ArefSpc[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
-		
+	
 	ArefSpc[0] *= 0.5						# FFT artefact correction
 	ASpc[0] *= 0.5
 	ArefSpc = np.fft.fftshift(np.fft.fft(ArefSpc[:], nbPtFreq))
@@ -195,9 +197,12 @@ def signal_generation():
 	ax4.plot(freq[:], ASpc.real)
 	ax4.plot(freq[:], ArefSpc.real)
 
-	fig1.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display
+	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
 	fig1.show()					# Display figure
 
+
+
+	# Saving data to Signal class
 	generatedSignal = sig.Signal()
 	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
 	generatedSignal.setValues_topspin(dw,td,de)
@@ -205,6 +210,10 @@ def signal_generation():
 
 	return generatedSignal
 
+
+###----------------------------------------------------------------------------
+### When this file is executed directly
+###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
 	s1 = signal_generation()
