@@ -288,6 +288,7 @@ def indMethod(s,m,n):
 		ind[i] = re[i] / (n-i-1)**2					# see eq. 4.63
 
 	nval = np.argmin(ind)
+#	print('\nnval\n', nval)
 #	print('\nind[nval]\n', ind[nval])
 #	print('\nind[nval-2:nval+3]\n', ind[nval-2:nval+3])
 	
@@ -344,6 +345,7 @@ def slMethod(s,m,n,max_err):
 	t[n-1, 5] = None
 
 	nval = np.argmax((t[:n-1,5]) > max_err) - 1
+#	print('\nnval\n', nval)
 #	print('\nt[nval,5]\n', t[nval,5])
 #	print('\nt[nval-2:nval+3,5]\n', t[nval-2:nval+3,5])
 
@@ -366,6 +368,7 @@ def svd_reconstruction(U, s_gpu, Vh, thres, choice):
 	thres: number of singular values keeped
 	choice: svd frontend used
 	'''
+	thres += 1				# to include last point
 	if choice=='arrayfire':
 		S_gpu = af.diag(s_gpu[:thres], 0, False).as_type(af.Dtype.c32)
 		mat_rec_gpu = af.matmul(U[:,:thres], \
@@ -431,13 +434,14 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 		# print("n :",n)
 
 	# svd decomposition
-	u, sgpu, scpu, v = svd_decomposition(data,svdTools)	
+	u, sgpu, scpu, v = svd_decomposition(data,svdTools)
 
 	# thresholding
 	if (thresMethod == 'IND'):
 		nval = indMethod(scpu,m,n)[0]
 	else:
 		nval = slMethod(scpu,m,n,max_err)
+#	print('\nnval\n', nval)
 
 	if nval < 0:
 		raise ValueError
@@ -567,25 +571,111 @@ if __name__ == "__main__":
 	
 	svd_init()
 
-	Amax = 4096
 	A = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
+	nbPtHalfEcho=104
+	nbHalfEcho=41
+	nbFullEchoTotal = int((nbHalfEcho+1)/2)
+	
+	Amax = int((nbHalfEcho+1) * nbPtHalfEcho)
+	nbPtFreq = int(Amax * 4)
+	
+	
+	
+	# Raw data
 	A = A[:Amax,0] + 1j*A[:Amax,1]
-	
-	newA = svd(A,svdMethod)
-	
-	plt.ion()					# interactive mode on
-	fig = plt.figure()
-	fig.suptitle("SVD processing", fontsize=16)
+	ASpc = A[:nbPtHalfEcho]
+	ASpc[0] *= 0.5				# FFT artefact correction
+	ASpc = np.fft.fftshift(np.fft.fft(ASpc[:], nbPtFreq))
 
-	ax1 = fig.add_subplot(211)
+	plt.ion()					# interactive mode on
+	fig1 = plt.figure()
+	fig1.suptitle("SVD processing", fontsize=16)
+
+	ax1 = fig1.add_subplot(411)
 	ax1.set_title("Raw FID")
 	ax1.plot(A[:].real)
-
-	ax2 = fig.add_subplot(212)
-	ax2.set_title("Denoised FID")
-	ax2.plot(newA[:].real)
-
-	fig.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-	fig.show()											# Display figure
 	
+	fig2 = plt.figure()
+	fig2.suptitle("SVD processing", fontsize=16)
+
+	ax1 = fig2.add_subplot(411)
+	ax1.set_title("Raw SPC")
+	ax1.plot(ASpc[:].real)
+	
+	
+	
+	# 1 : SVD applied on 1D data converted to Toeplitz matrix --> very long
+	svdMethod = 1
+	newA = svd(A,svdMethod)
+	
+	newASpc = newA[:nbPtHalfEcho]
+	newASpc[0] *= 0.5				# FFT artefact correction
+	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:], nbPtFreq))
+
+	ax2 = fig1.add_subplot(412)
+	ax2.set_title("Denoised FID with method 1")
+	ax2.plot(newA[:].real)
+	
+	ax2 = fig2.add_subplot(412)
+	ax2.set_title("Denoised SPC with method 1")
+	ax2.plot(newASpc[:].real)
+	
+	
+	
+	# Conversion to 2D
+	firstHalfEcho = np.zeros((nbPtHalfEcho), dtype=np.complex)
+	A = np.concatenate((firstHalfEcho[:],A[:Amax-nbPtHalfEcho]))
+	A = A.reshape(nbFullEchoTotal, 2*nbPtHalfEcho)
+	
+	
+	
+	# 2 : SVD applied on 2D data --> very fast
+	svdMethod = 2
+	newA = svd(A,svdMethod)
+	
+	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	newASpc[:,0] *= 0.5				# FFT artefact correction
+	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
+	newASpc[0,:] *= 2					# for first half echo
+
+	ax3 = fig1.add_subplot(413)
+	ax3.set_title("Denoised FID with method 2")
+	for i in range (0,nbFullEchoTotal,5):
+		ax3.plot(newA[i,:].real)
+	
+	ax3 = fig2.add_subplot(413)
+	ax3.set_title("Denoised SPC with method 2")
+	for i in range (0,nbFullEchoTotal,5):
+		ax3.plot(newASpc[i,:].real)
+	
+	
+	
+	# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
+	svdMethod = 3
+	newA = svd(A,svdMethod)
+	
+	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	newASpc[:,0] *= 0.5				# FFT artefact correction
+	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
+	newASpc[0,:] *= 2					# for first half echo
+
+	ax4 = fig1.add_subplot(414)
+	ax4.set_title("Denoised FID with method 3")
+	for i in range (0,nbFullEchoTotal,5):
+		ax4.plot(newA[i,:].real)
+	
+	ax4 = fig2.add_subplot(414)
+	ax4.set_title("Denoised SPC with method 3")
+	for i in range (0,nbFullEchoTotal,5):
+		ax4.plot(newASpc[i,:].real)
+
+
+
+		# Display figures
+	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
+	fig1.show()												# Display figure
+	
+	fig2.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
+	fig2.show()												# Display figure
+
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

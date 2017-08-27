@@ -217,8 +217,8 @@ def signal_generation():
 
 if __name__ == "__main__":
 	s1 = signal_generation()
-	print('s1.dw : ', s1.dw)
-	print('s1.data : ', s1.data)
+#	print('s1.dw : ', s1.dw)
+#	print('s1.data : ', s1.data)
 	
 	np.savetxt('CPMG_FID.csv', np.transpose([s1.data[:].real, s1.data[:].imag]),\
 			delimiter='\t', header='sep=\t', comments='')

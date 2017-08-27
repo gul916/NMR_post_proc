@@ -162,14 +162,14 @@ def signal_processing(processedSig):
 	# si 1ere decroissance : on inclut un demi echo de 0 devant 
 	if firstDec:
 		A[0:nbPtHalfEcho] *= 2		# !!! A mettre juste avant la FFT
-		firstHalfEcho = np.zeros((nbPtHalfEcho,), dtype=np.complex)
+		firstHalfEcho = np.zeros((nbPtHalfEcho), dtype=np.complex)
 		echos1D = np.concatenate((firstHalfEcho[:],echos1D[:]))
 	print("echos1D.size =", echos1D.size)
 
 
 	# separation après avoir determiné le nb de pts des echos et le nb d'echos
 	nbPtFullEcho = 2*nbPtHalfEcho
-	nbFullEchoTotal = int((nbHalfEcho+1)/2) 
+	nbFullEchoTotal = int((nbHalfEcho+1)/2)
 	# print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
 	echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
