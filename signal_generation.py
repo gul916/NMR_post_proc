@@ -5,8 +5,10 @@
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
+# Python libraries
 import matplotlib.pyplot as plt
 import numpy as np
+# User defined libraries
 import signalTopspin as sig
 
 
@@ -16,15 +18,19 @@ import signalTopspin as sig
 ###----------------------------------------------------------------------------
 
 # Asked to the user
+firstDec = True
 fullEcho = 10e-3
 nbEcho = 20					# 38 for less than 8k points, 76 for more
-firstDec = True
 
 # From Topspin interface
-dw = 24e-6					# dwell time between two points
 td = 32768					# nb of real points + nb of imag points
+dw = 24e-6					# dwell time between two points
 de = 96e-6					# dead time before signal acquisition
 # de = 0
+
+# Simulation of noise
+mean = 0
+std = 0.1
 
 # 1st frequency
 t21 = 500e-3
@@ -36,15 +42,11 @@ t22 = 100e-3
 t22star = 0.5e-3
 nu2 = -2500
 
-# Simulation of noise
-mean = 0
-std = 0.1
-
 # Calculated
 halfEcho = fullEcho / 2
-nbHalfEcho = (nbEcho * 2)
+nbHalfEcho = int(nbEcho * 2)
 if firstDec == True:
-	nbHalfEcho += 1
+	nbHalfEcho += int(1)
 
 dw2 = 2*dw							# 1 real + 1 imag points are needed to have a complex point
 td2 = int(td/2)					# nb of complex points
@@ -205,7 +207,7 @@ def signal_generation():
 	# Saving data to Signal class
 	generatedSignal = sig.Signal()
 	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
-	generatedSignal.setValues_topspin(dw,td,de)
+	generatedSignal.setValues_topspin(td,dw,de)
 	generatedSignal.setData(A)
 
 	return generatedSignal
@@ -220,7 +222,30 @@ if __name__ == "__main__":
 #	print('s1.dw : ', s1.dw)
 #	print('s1.data : ', s1.data)
 	
-	np.savetxt('CPMG_FID.csv', np.transpose([s1.data[:].real, s1.data[:].imag]),\
-			delimiter='\t', header='sep=\t', comments='')
+#	np.savetxt('CPMG_FID.csv', np.transpose([s1.data[:].real, s1.data[:].imag]),\
+#			delimiter='\t', header='sep=\t', comments='')
+
+	###Values used to save CPMG_FID.csv, please don't overwrite this file.
+	#fullEcho = 10e-3
+	#nbEcho = 20				# 38 for less than 8k points, 76 for more
+	#firstDec = True
+	#
+	#dw = 24e-6					# dwell time between two points
+	#td = 32768					# nb of real points + nb of imag points
+	#de = 96e-6					# dead time before signal acquisition
+	#
+	#mean = 0
+	#std = 0.1
+	#
+	#t21 = 500e-3
+	#t21star = 1e-3
+	#nu1 = 1750
+	#
+	#t22 = 100e-3
+	#t22star = 0.5e-3
+	#nu2 = -2500
+	#
+	
+	
 	
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

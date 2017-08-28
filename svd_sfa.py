@@ -5,6 +5,7 @@
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
+# Python libraries
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -569,7 +570,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 
 if __name__ == "__main__":
 	
-	svd_init()
+	svd_init(svd_tools_resolution_override)
 
 	A = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
 	nbPtHalfEcho=104
@@ -600,6 +601,7 @@ if __name__ == "__main__":
 
 	ax1 = fig2.add_subplot(411)
 	ax1.set_title("Raw SPC")
+	ax1.invert_xaxis()
 	ax1.plot(ASpc[:].real)
 	
 	
@@ -618,12 +620,14 @@ if __name__ == "__main__":
 	
 	ax2 = fig2.add_subplot(412)
 	ax2.set_title("Denoised SPC with method 1")
+	ax2.invert_xaxis()
 	ax2.plot(newASpc[:].real)
 	
 	
 	
 	# Conversion to 2D
 	firstHalfEcho = np.zeros((nbPtHalfEcho), dtype=np.complex)
+#	firstHalfEcho = A[nbPtHalfEcho:0:-1].real -1j*A[nbPtHalfEcho:0:-1].imag
 	A = np.concatenate((firstHalfEcho[:],A[:Amax-nbPtHalfEcho]))
 	A = A.reshape(nbFullEchoTotal, 2*nbPtHalfEcho)
 	
@@ -636,7 +640,6 @@ if __name__ == "__main__":
 	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
 	newASpc[:,0] *= 0.5				# FFT artefact correction
 	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
-	newASpc[0,:] *= 2					# for first half echo
 
 	ax3 = fig1.add_subplot(413)
 	ax3.set_title("Denoised FID with method 2")
@@ -645,6 +648,7 @@ if __name__ == "__main__":
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("Denoised SPC with method 2")
+	ax3.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
 		ax3.plot(newASpc[i,:].real)
 	
@@ -657,7 +661,6 @@ if __name__ == "__main__":
 	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
 	newASpc[:,0] *= 0.5				# FFT artefact correction
 	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
-	newASpc[0,:] *= 2					# for first half echo
 
 	ax4 = fig1.add_subplot(414)
 	ax4.set_title("Denoised FID with method 3")
@@ -666,6 +669,7 @@ if __name__ == "__main__":
 	
 	ax4 = fig2.add_subplot(414)
 	ax4.set_title("Denoised SPC with method 3")
+	ax4.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
 		ax4.plot(newASpc[i,:].real)
 
@@ -677,5 +681,7 @@ if __name__ == "__main__":
 	
 	fig2.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
 	fig2.show()												# Display figure
+
+
 
 	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

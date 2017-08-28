@@ -5,14 +5,14 @@
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
+# Python libraries
 import matplotlib.pyplot as plt
 import numpy as np
-
-#import signal_generation as sigG
-#processedSig = sigG.signalCreation()
-
+# User defined libraries
+import signalTopspin as sig
 import svd_sfa as svd
 svd.svd_init()
+
 
 
 def signal_processing(processedSig):
@@ -23,44 +23,44 @@ def signal_processing(processedSig):
 	### PARAMETERS
 	###-------------------------------------------------------------------------
 
-	# demandés à l'utilisateur :
+	# Singular Value Decomposition
+	# 0 : no SVD applied
+	# Method 1: on full 1D with echoes --> very long
+	# Method 2: on full 2D of stacked echoes --> very fast
+	# Method 3: on separated echoes --> fast
+
+#	if nbPtSignal <= 8192:
+#		SVD_method = 1
+#	else:
+#		SVD_method = 2
+#	thres = 16
+	
+	SVD_method = 2
+
+	# Asked to the user
 	firstDec = processedSig.firstDec
 	fullEcho = processedSig.fullEcho
-	halfEcho = processedSig.halfEcho
 	nbEcho = processedSig.nbEcho
-	nbHalfEcho = processedSig.nbHalfEcho 
 
-	# paramètres :
-	dw = processedSig.dw					# temps entre 2 prises de points
-	dw2 = processedSig.dw2
+	# From Topspin interface
 	td = processedSig.td				# nb de pts complexes  ( td == td/2 )
-	aquiT = processedSig.aquiT	# temps acquisition total : aquiT = (td-1)*dw2
+	dw = processedSig.dw					# Dwell time between two points
 	de = processedSig.de					# temps de non-acquisition au début
-	# de = 0
-
-
-	lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 
 	# calculés :
+	halfEcho = processedSig.halfEcho
+	nbHalfEcho = processedSig.nbHalfEcho 
+	dw2 = processedSig.dw2
+	aquiT = processedSig.aquiT	# temps acquisition total : aquiT = (td-1)*dw2
 	dureeT = processedSig.dureeT
+
+	lb = 3/(np.pi*halfEcho)		# line broadening (Herz)
 	dureeSignal = processedSig.dureeSignal
 	nbPtHalfEcho = processedSig.nbPtHalfEcho
 	nbPtSignal = processedSig.nbPtSignal
 	missingPts = processedSig.missingPts
 	nbPtDeadTime = processedSig.nbPtDeadTime
 
-	# Singular Value Decomposition
-	# 0 : no SVD applied
-	# Method 1: on full 1D with echoes --> very long
-	# Method 2: on full 2D of stacked echoes --> very fast
-	# Method 3: on separated echoes --> fast
-	SVD_method = 2
-
-	#if nbPtSignal <= 8192:
-	#	SVD_method = 1
-	#else:
-	#	SVD_method = 2
-	#thres = 16
 
 
 	###----------------------------------------------------------------------------
@@ -190,17 +190,17 @@ def signal_processing(processedSig):
 		# print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i, nbPtHalfEcho])
 
 
-	'''
-	# somme des echos (temporelle) et affichage 
-	# Rq : pas utilisé pour la suite -> juste pour voir ce que donne la somme temporelle
-	sommeTempo = np.zeros((nbPtFullEcho,nbFullEchoTotal), dtype=np.complex)
-	for i in range (0, nbFullEchoTotal):
-		for j in range (0, nbPtFullEcho):
-			sommeTempo[j] += echos2D[i, j]
-	plt.figure()
-	plt.plot(timeFullEcho[:],sommeTempo[0:nbPtFullEcho].real)
-	plt.show() # affiche la figure a l'ecran
-	'''
+
+#	# somme des echos (temporelle) et affichage 
+#	# Rq : pas utilisé pour la suite -> juste pour voir ce que donne la somme temporelle
+#	sommeTempo = np.zeros((nbPtFullEcho,nbFullEchoTotal), dtype=np.complex)
+#	for i in range (0, nbFullEchoTotal):
+#		for j in range (0, nbPtFullEcho):
+#			sommeTempo[j] += echos2D[i, j]
+#	plt.figure()
+#	plt.plot(timeFullEcho[:],sommeTempo[0:nbPtFullEcho].real)
+#	plt.show() # affiche la figure a l'ecran
+
 
 
 	# Singular Value Decompostion (SVD) on echo matrix
@@ -222,9 +222,11 @@ def signal_processing(processedSig):
 		ax2.set_title("FID after SVD on Toeplitz matrix of echoes")
 		for i in range (0, nbFullEchoTotal):
 			ax2.plot(timeFullEcho[:],(echos2D[i, :]).real)
-		
+
+
 
 	# prediction lineaire
+
 
 
 	# somme ponderee -> calcul de Imax
@@ -235,7 +237,9 @@ def signal_processing(processedSig):
 		Imax[i] = np.amax((echos2D[i,:]).real)
 
 
+
 	# correction T2
+
 
 
 	# fftshift => inversion des halfEcho 2 à 2
@@ -249,13 +253,17 @@ def signal_processing(processedSig):
 		ax3.plot(timeFullEcho[:],(echosFFT[i, 0:nbPtFullEcho]).real)
 
 
+
 	# ponderation par Imax
 	for i in range (0, nbFullEchoTotal):
 		echosFFT[i, 0:nbPtFullEcho]*=Imax[i]
 
+
+
 	# affichage du spectre de la 1ere decroissance pour comparaison avec la somme
 	timeFullEcho = np.linspace(0,fullEcho-dw2,nbPtFullEcho)
 	#plt.plot(timeFullEcho[:],echosFFT[0, 0:nbPtFullEcho].real)
+
 
 
 	# somme des echos (spectrale)
@@ -270,8 +278,42 @@ def signal_processing(processedSig):
 	fig3.show()					# Display figure
 
 
-	#print("\n------------------------------------------------------------------------\n\n")
-
-	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
 
 	return sommeSpect
+
+###----------------------------------------------------------------------------
+### When this file is executed directly
+###----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+	import sys
+	
+	print('len(sys.argv)', len(sys.argv))
+
+	if len(sys.argv) == 1:
+#		import signal_generation as sigG
+#		processedSig = sigG.signalCreation()
+		
+		A_data = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
+		
+		A_firstDec = True
+		A_fullEcho = 10e-3
+		A_nbEcho = 20				# 38 for less than 8k points, 76 for more
+		
+		A_td = 32768					# nb of real points + nb of imag points
+		A_dw = 24e-6					# dwell time between two points
+		A_de = 96e-6					# dead time before signal acquisition
+		
+		# Saving data to Signal class
+		rawFID = sig.Signal()
+		rawFID.setValues_user(A_firstDec,A_fullEcho,A_nbEcho)
+		rawFID.setValues_topspin(A_td,A_dw,A_de)
+		rawFID.setData(A_data)
+	else:
+		print("Additional arguments are not yet supported")
+	
+	processed = signal_processing(rawFID)
+
+
+
+	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal

@@ -5,7 +5,10 @@
 @authors: Pierre-Aymeric GILLES & Guillaume LAURENT
 """
 
+# Python libraries
 import numpy as np
+
+
 
 class Signal:
 	"""
@@ -22,7 +25,7 @@ class Signal:
 		self._dw = 0
 		self._dw2 = 0
 		self._td = 0
-		self._aquiT = 0
+		self._acquiT = 0
 		self._de = 0
 
 		self._dureeT = 0
@@ -111,11 +114,11 @@ class Signal:
 	td = property(_get_nbPt,_set_nbPt)
 	
 
-	def _get_aquiT(self):
-		return self._aquiT
-	aquiT = property(_get_aquiT)
-	def set_aquiT(self):
-		self._aquiT = (self._td -1)*self._dw2
+	def _get_acquiT(self):
+		return self._acquiT
+	acquiT = property(_get_acquiT)
+	def set_acquiT(self):
+		self._acquiT = (self._td -1)*self._dw2
 
 
 	def _get_de(self):
@@ -129,7 +132,7 @@ class Signal:
 		return self._dureeT
 	dureeT = property(_get_dureeT)
 	def set_dureeT(self):
-		self._dureeT = self._aquiT + self._de
+		self._dureeT = self._acquiT + self._de
 
 
 	def _get_dureeSignal(self):
@@ -185,12 +188,12 @@ class Signal:
 		else:
 			self._userInitialised = True
 
-	def setValues_topspin(self,newdw,newnbPt,newde):
+	def setValues_topspin(self,newnbPt,newdw,newde):
 		try:
-			self.dw = newdw
 			self.td = newnbPt
+			self.dw = newdw
 			self.de = newde
-			self.set_aquiT()
+			self.set_acquiT()
 			self.set_dureeT()
 			self.set_nbPtDeadTime()
 		except ValueError as err:
