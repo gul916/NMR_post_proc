@@ -111,7 +111,18 @@ def svd_init(override=svd_tools_resolution_override):
 
 	print('Establishing modules to import / Importing')
 
-	if override == 1:
+	if override == 0:
+		# default choice
+
+		arrayfireOK = import_arrayfire()
+
+		if (not arrayfireOK):
+			skcudaOK = import_skcuda()
+
+			if (not skcudaOK):
+				scipyOK = import_scipy()
+
+	elif override == 1:
 		print('\noverride == 1  =>')
 		print('  Forcing load of module arrayfire')
 		arrayfireOK = import_arrayfire()
@@ -126,20 +137,9 @@ def svd_init(override=svd_tools_resolution_override):
 		print('  Forcing load of module scipy')
 		scipyOK = import_scipy()
 
-	elif override == 0:
-		# default choice
-
-		arrayfireOK = import_arrayfire()
-
-		if (not arrayfireOK):
-			skcudaOK = import_skcuda()
-
-			if (not skcudaOK):
-				scipyOK = import_scipy()
-
 	else:
-		print("\nInvalid value specified for override ("\
-			,override,"). Correct values : 0 1 2 3")
+		print("\nInvalid value specified for override (", \
+			override,"). Correct values : 0 1 2 3")
 
 	initCalled = True
 
@@ -584,9 +584,9 @@ if __name__ == "__main__":
 	
 	# Raw data
 	A = A[:Amax,0] + 1j*A[:Amax,1]
-	ASpc = A[:nbPtHalfEcho]
-	ASpc[0] *= 0.5				# FFT artefact correction
-	ASpc = np.fft.fftshift(np.fft.fft(ASpc[:], nbPtFreq))
+	ASPC = A[:nbPtHalfEcho]
+	ASPC[0] *= 0.5				# FFT artefact correction
+	ASPC = np.fft.fftshift(np.fft.fft(ASPC[:], nbPtFreq))
 
 	plt.ion()					# interactive mode on
 	fig1 = plt.figure()
@@ -602,7 +602,7 @@ if __name__ == "__main__":
 	ax1 = fig2.add_subplot(411)
 	ax1.set_title("Raw SPC")
 	ax1.invert_xaxis()
-	ax1.plot(ASpc[:].real)
+	ax1.plot(ASPC[:].real)
 	
 	
 	
@@ -610,9 +610,9 @@ if __name__ == "__main__":
 	svdMethod = 1
 	newA = svd(A,svdMethod)
 	
-	newASpc = newA[:nbPtHalfEcho]
-	newASpc[0] *= 0.5				# FFT artefact correction
-	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:], nbPtFreq))
+	newASPC = newA[:nbPtHalfEcho]
+	newASPC[0] *= 0.5				# FFT artefact correction
+	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:], nbPtFreq))
 
 	ax2 = fig1.add_subplot(412)
 	ax2.set_title("Denoised FID with method 1")
@@ -621,7 +621,7 @@ if __name__ == "__main__":
 	ax2 = fig2.add_subplot(412)
 	ax2.set_title("Denoised SPC with method 1")
 	ax2.invert_xaxis()
-	ax2.plot(newASpc[:].real)
+	ax2.plot(newASPC[:].real)
 	
 	
 	
@@ -637,9 +637,9 @@ if __name__ == "__main__":
 	svdMethod = 2
 	newA = svd(A,svdMethod)
 	
-	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	newASpc[:,0] *= 0.5				# FFT artefact correction
-	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
+	newASPC = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	newASPC[:,0] *= 0.5				# FFT artefact correction
+	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:,:], nbPtFreq))
 
 	ax3 = fig1.add_subplot(413)
 	ax3.set_title("Denoised FID with method 2")
@@ -650,7 +650,7 @@ if __name__ == "__main__":
 	ax3.set_title("Denoised SPC with method 2")
 	ax3.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
-		ax3.plot(newASpc[i,:].real)
+		ax3.plot(newASPC[i,:].real)
 	
 	
 	
@@ -658,9 +658,9 @@ if __name__ == "__main__":
 	svdMethod = 3
 	newA = svd(A,svdMethod)
 	
-	newASpc = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	newASpc[:,0] *= 0.5				# FFT artefact correction
-	newASpc = np.fft.fftshift(np.fft.fft(newASpc[:,:], nbPtFreq))
+	newASPC = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	newASPC[:,0] *= 0.5				# FFT artefact correction
+	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:,:], nbPtFreq))
 
 	ax4 = fig1.add_subplot(414)
 	ax4.set_title("Denoised FID with method 3")
@@ -671,7 +671,7 @@ if __name__ == "__main__":
 	ax4.set_title("Denoised SPC with method 3")
 	ax4.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
-		ax4.plot(newASpc[i,:].real)
+		ax4.plot(newASPC[i,:].real)
 
 
 

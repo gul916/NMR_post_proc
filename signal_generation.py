@@ -48,9 +48,9 @@ nbHalfEcho = int(nbEcho * 2)
 if firstDec == True:
 	nbHalfEcho += int(1)
 
-dw2 = 2*dw							# 1 real + 1 imag points are needed to have a complex point
-td2 = int(td/2)					# nb of complex points
-acquiT = (td2-1)*dw2				# total acquisition time, starts at 0
+dw2 = 2*dw					# 1 real + 1 imag points are needed to have a complex point
+td2 = int(td/2)				# nb of complex points
+acquiT = (td2-1)*dw2			# total acquisition time, starts at 0
 dureeSignal = nbHalfEcho * halfEcho
 nbPtHalfEcho = int(halfEcho / dw2)
 nbPtSignal = int(nbPtHalfEcho * nbHalfEcho)
@@ -87,7 +87,6 @@ freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 
 # print("\n Valeurs calculées :\n")
 # print("\tdureeSignal =", dureeSignal)
-# print("\tduree totale (dureeT) =", dureeT)
 # print("\tnbPtHalfEcho =", nbPtHalfEcho)
 # #print("\tnbPtSignal_via_dureeSignal =", nbPtSignal_via_dureeSignal)
 # #print("\tnbPtSignal_via_nbPtHalfEcho =", nbPtSignal)
@@ -99,7 +98,7 @@ freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
 # print("\nSpecified SVD method :", SVD_method)
 
 
-###----------------------------------------------------------------------------
+#%%---------------------------------------------------------------------------
 ### SYNTHESE DE SIGNAL RMN
 ###----------------------------------------------------------------------------
 
@@ -119,9 +118,9 @@ def signal_generation():
 
 		if(desc==True):
 			yi1 = np.exp(1j*2*np.pi*nu1*(timei[:]-deb)) \
-				*np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)
+				* np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)
 			yi2 = np.exp(1j*2*np.pi*nu2*(timei[:]-deb)) \
-				*np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)
+				* np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)
 	#		yi2 = np.zeros(timei.size, dtype='complex')
 		else:
 			yi1 = np.exp(1j*2*np.pi*nu1*(-(fin+dw2)+timei[:])) \
@@ -141,16 +140,6 @@ def signal_generation():
 	Aref = np.concatenate((Aref[:],end[:]))
 	#print("\tAref.size =",Aref.size)
 
-	# Reference signal display
-	plt.ion()					# interactive mode on
-	fig1 = plt.figure()
-	fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
-
-	ax1 = fig1.add_subplot(411)
-	ax1.set_title("Reference FID")
-	ax1.plot(timeT[:],Aref[:].real)
-	ax1.plot(timeT[:],Aref[:].imag)
-
 	A = Aref.copy()		# Avoid reference signal corruption
 
 
@@ -158,12 +147,7 @@ def signal_generation():
 	# Suppression of points during dead time 
 	end = np.zeros(nbPtDeadTime, dtype=np.complex)
 	A = np.concatenate((A[nbPtDeadTime:],end[:]))
-
-	# Signal display after dead time suppression
-	ax2 = fig1.add_subplot(412)
-	ax2.set_title("FID with dead time")
-	ax2.plot(timeT[:],A[:].real)
-	ax2.plot(timeT[:],A[:].imag)
+	Adead = A.copy()
 
 
 
@@ -171,16 +155,19 @@ def signal_generation():
 	noise = np.random.normal(mean, std, td2) + 1j*np.random.normal(mean, std, td2)
 	A+=noise
 
-	# Signal display after dead time suppression and noise addition
-	ax3 = fig1.add_subplot(413)
-	ax3.set_title("FID with dead time and noise")
-	ax3.plot(timeT[:],A[:].real)
-	ax3.plot(timeT[:],A[:].imag)
+
+
+	# Saving data to Signal class
+	generatedSignal = sig.Signal()
+	generatedSignal.setValues_topspin(td,dw,de)
+	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
+	generatedSignal.setData(A)
 
 
 
-	# Spectra display
-	ArefSpc = Aref.copy()				# Avoid reference FID corruption
+	#%% Figures
+	# Spectra calculation
+	ArefSpc = Aref.copy()					# Avoid reference FID corruption
 	ASpc = A.copy()						# Avoid noisy FID corruption
 
 	if firstDec == True:
@@ -192,28 +179,49 @@ def signal_generation():
 	ASpc[0] *= 0.5
 	ArefSpc = np.fft.fftshift(np.fft.fft(ArefSpc[:], nbPtFreq))
 	ASpc = np.fft.fftshift(np.fft.fft(ASpc[:], nbPtFreq))	# FFT with zero filling
-	
+
+	# Plotting
+	plt.ion()					# interactive mode on
+	fig1 = plt.figure()
+	fig1.suptitle("CPMG NMR signal synthesis", fontsize=16)
+
+	# Reference signal display
+	ax1 = fig1.add_subplot(411)
+	ax1.set_title("Reference FID")
+	ax1.plot(timeT[:],Aref[:].real)
+	ax1.plot(timeT[:],Aref[:].imag)
+	ax1.set_xlim([-halfEcho, acquiT+halfEcho])
+
+	# Signal display after dead time suppression
+	ax2 = fig1.add_subplot(412)
+	ax2.set_title("FID after dead time suppression")
+	ax2.plot(timeT[:],Adead[:].real)
+	ax2.plot(timeT[:],Adead[:].imag)
+	ax2.set_xlim([-halfEcho, acquiT+halfEcho])
+
+	# Signal display after dead time suppression and noise addition
+	ax3 = fig1.add_subplot(413)
+	ax3.set_title("FID with added noise")
+	ax3.plot(timeT[:],A[:].real)
+	ax3.plot(timeT[:],A[:].imag)
+	ax3.set_xlim([-halfEcho, acquiT+halfEcho])
+
+	# Spectra display
 	ax4 = fig1.add_subplot(414)
-	ax4.set_title("SPC with dead time and noise and reference SPC")
+	ax4.set_title("Noisy SPC and reference SPC")
 	ax4.invert_xaxis()
 	ax4.plot(freq[:], ASpc.real)
 	ax4.plot(freq[:], ArefSpc.real)
 
 	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-	fig1.show()					# Display figure
+	fig1.show()								# Display figure
 
 
-
-	# Saving data to Signal class
-	generatedSignal = sig.Signal()
-	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
-	generatedSignal.setValues_topspin(td,dw,de)
-	generatedSignal.setData(A)
 
 	return generatedSignal
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 

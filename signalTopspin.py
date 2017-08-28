@@ -25,10 +25,10 @@ class Signal:
 		self._dw = 0
 		self._dw2 = 0
 		self._td = 0
+		self._td2 = 0
 		self._acquiT = 0
 		self._de = 0
 
-		self._dureeT = 0
 		self._dureeSignal = 0
 		self._nbPtHalfEcho = 0
 		self._nbPtSignal = 0
@@ -111,14 +111,20 @@ class Signal:
 		if newnbPt <= 0:
 			raise ValueError("dw must be > 0")
 		self._td = newnbPt
+		self._td2 = int(self._td / 2)
 	td = property(_get_nbPt,_set_nbPt)
 	
+	
+	def _get_td2(self):
+		return self._td2
+	td2 = property(_get_td2)
+
 
 	def _get_acquiT(self):
 		return self._acquiT
 	acquiT = property(_get_acquiT)
 	def set_acquiT(self):
-		self._acquiT = (self._td -1)*self._dw2
+		self._acquiT = (self._td2 -1)*self._dw2
 
 
 	def _get_de(self):
@@ -128,18 +134,13 @@ class Signal:
 	de = property(_get_de,_set_de)
 
 
-	def _get_dureeT(self):
-		return self._dureeT
-	dureeT = property(_get_dureeT)
-	def set_dureeT(self):
-		self._dureeT = self._acquiT + self._de
-
-
 	def _get_dureeSignal(self):
 		return self._dureeSignal
 	dureeSignal = property(_get_dureeSignal)
 	def set_dureeSignal(self):
 		self._dureeSignal = self._nbHalfEcho * self._halfEcho
+		if (self._dureeSignal > self._acquiT):
+			raise ValueError("Too many echoes during acquisition time")
 
 
 	def _get_nbPtHalfEcho(self):
@@ -148,7 +149,7 @@ class Signal:
 	def set_nbPtHalfEcho(self):
 		self._nbPtHalfEcho = int(self._halfEcho / self._dw2)
 		if (self._halfEcho % self._dw2) != 0:
-			print("Warning : fullEcho is supposed to be a multiple of dw2")
+			print("Warning : HalfEcho is supposed to be a multiple of 2*dw")
 
 
 	def _get_nbPtSignal(self):
@@ -171,11 +172,27 @@ class Signal:
 	def set_nbPtDeadTime(self):
 		self._nbPtDeadTime = int(self._de / self._dw2)
 		if (self._de % self._dw2) != 0:
-			print("Warning : de is supposed to be a multiple of dw2")
+			print("Warning : de is supposed to be a multiple of 2*dw")
 
+
+	def setValues_topspin(self,newnbPt,newdw,newde):
+		try:
+			self.td = newnbPt
+			self.dw = newdw
+			self.de = newde
+			self.set_acquiT()
+			self.set_nbPtDeadTime()
+		except ValueError as err:
+			print("function setValues_topspin() returns error :")
+			print("  ",err.args[0])
+			print()
+		else:
+			self._topspinInitialised = True
 
 
 	def setValues_user(self,newfirstDec,newfullEcho,newnbEcho):
+		if not self._topspinInitialised:
+			raise ValueError("You must set topsin values with setValues_topspin() first !")
 		try:
 			self.firstDec = newfirstDec
 			self.fullEcho = newfullEcho
@@ -188,20 +205,6 @@ class Signal:
 		else:
 			self._userInitialised = True
 
-	def setValues_topspin(self,newnbPt,newdw,newde):
-		try:
-			self.td = newnbPt
-			self.dw = newdw
-			self.de = newde
-			self.set_acquiT()
-			self.set_dureeT()
-			self.set_nbPtDeadTime()
-		except ValueError as err:
-			print("function setValues_topspin() returns error :")
-			print("  ",err.args[0])
-			print()
-		else:
-			self._topspinInitialised = True
 
 	def checkInitialisation(self):
 		if not self._topspinInitialised:
