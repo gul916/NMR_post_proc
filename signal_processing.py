@@ -66,6 +66,7 @@ def signal_processing(processedSig):
 	timeFullEcho = timeT[:nbPtFullEcho]
 	nbPtFreq = int(td2*4)			# zero filling
 	freq = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFreq)
+	freqFullEcho = np.linspace(-1/(2*dw2), 1/(2*dw2), nbPtFullEcho)
 
 
 	###----------------------------------------------------------------------------
@@ -225,7 +226,7 @@ def signal_processing(processedSig):
 
 	#%% Spectra calculation
 	ArawSPC = Araw.copy()
-	ArawSPC[0] *= 0.5				# FFT artefact correction
+	ArawSPC[0] *= 0.5					# FFT artefact correction
 	ArawSPC = np.fft.fftshift(np.fft.fft(ArawSPC[:], nbPtFreq))
 
 	echos1DpreprocSPC = echos1Dpreproc.copy()
@@ -235,18 +236,19 @@ def signal_processing(processedSig):
 	echos2DsvdSPC = echos2Dsvd.copy()
 	echos2DsvdSPC = np.fft.fftshift(echos2DsvdSPC, axes=1) 	# to avoid phasing
 	echos2DsvdSPC[:,0] *= 0.5		# FFT artefact correction
-	echos2DsvdSPC = np.fft.fftshift(np.fft.fft(echos2DsvdSPC[:,:], nbPtFreq, \
-		axis=1), axes=1)
+	echos2DsvdSPC = np.fft.fftshift(np.fft.fft(echos2DsvdSPC[:,:], \
+		axis=1), axes=1)				# no zero-filling on full echo
 
 	sommeFIDSPC = sommeFID.copy()
 	sommeFIDSPC = np.fft.fftshift(sommeFIDSPC) 		# to avoid phasing
-	sommeFIDSPC *= 0.5			# FFT artefact correction
-	sommeFIDSPC = np.fft.fftshift(np.fft.fft(sommeFIDSPC[:], nbPtFreq))
+	sommeFIDSPC *= 0.5				# FFT artefact correction
+	sommeFIDSPC = np.fft.fftshift(np.fft.fft(sommeFIDSPC[:]))
+											# no zero-filling on full echo
 
 
 
 	#%% Figures
-	plt.ion()					# interactive mode on
+	plt.ion()							# interactive mode on
 	
 	# FID
 	fig1 = plt.figure()
@@ -294,21 +296,21 @@ def signal_processing(processedSig):
 	ax2 = fig2.add_subplot(412)
 	ax2.set_title("SCP after preprocessing")
 	ax2.plot(freq[:],echos1DpreprocSPC[:].real)
-#	ax2.plot(freq[:nbPtSignal],echos1Dpreproc[:].imag)
+#	ax2.plot(freq[:],echos1Dpreproc[:].imag)
 	ax2.invert_xaxis()
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("SPC after SVD and echo separation")
 	for i in range (0, nbFullEchoTotal,5):
-		ax3.plot(freq[:],(echos2DsvdSPC[i,:]).real)
+		ax3.plot(freqFullEcho[:],(echos2DsvdSPC[i,:]).imag)
 #		print("\t1er elem du demi echo", 2*i ," =", echos2D[i, 0])
 #		print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i, nbPtHalfEcho])
 	ax3.invert_xaxis()
 	
 	ax4 = fig2.add_subplot(414)
 	ax4.set_title("SPC after ponderated sum")
-	ax4.plot(freq[:],sommeFIDSPC[:].real)
-#	ax4.plot(timeFullEcho[:],sommeFID[:].imag)
+	ax4.plot(freqFullEcho[:],sommeFIDSPC[:].imag)
+#	ax4.plot(freqFullEcho[:],sommeFID[:].imag)
 	ax4.invert_xaxis()
 	
 	fig2.tight_layout(rect=[0, 0, 1, 0.95])			# Avoid superpositions on display

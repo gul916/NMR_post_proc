@@ -522,7 +522,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 					for i in range (0, nbPtSignal):
 						data_rec[i] = np.mean(np.diag(mat_rec[:,:],i-row+1))
 
-					print("thres = ",thres)
+					print("number of singular values = ",thres+1)
 					
 				elif svdMethod == 2:
 					# Singular Value Decompostion (SVD) on echo matrix
@@ -530,7 +530,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 
 					data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
 
-					print("thres = ",thres)
+					print("number of singular values = ",thres+1)
 
 				elif svdMethod == 3:
 					# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
@@ -546,7 +546,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 					for i in range (0, nslices):
 						mat = linalg.toeplitz(data64[i,row-1::-1], data64[i,row-1::1])
 						mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
-						print("thres = ",thres)
+						print("number of singular values = ",thres+1)
 						for j in range (0, nbPtSlice):
 							data_rec[i,j] = np.mean(np.diag(mat_rec[:,:],j-row+1))
 				
