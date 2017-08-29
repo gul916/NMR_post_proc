@@ -36,13 +36,15 @@ std = 0.1
 nu1 = 1750
 t21 = 500e-3
 t21star = 1e-3
-sigma1 = np.sqrt(2*np.log(2))*t21star;
+sigma1 = np.sqrt(2*np.log(2))*t21star
+gl1 = 0						# 0: Lorentzian shape, 1: Gaussian shape
 
 # 2nd frequency
 nu2 = -2500
 t22 = 100e-3
 t22star = 0.5e-3
 sigma2 = np.sqrt(2*np.log(2))*t22star;
+gl2 = 0						# 0: Lorentzian shape, 1: Gaussian shape
 
 # Calculated
 halfEcho = fullEcho / 2
@@ -58,6 +60,11 @@ nbPtHalfEcho = int(halfEcho / dw2)
 nbPtSignal = int(nbPtHalfEcho * nbHalfEcho)
 missingPts = int(td2-nbPtSignal)		# Number of points after last echo
 nbPtDeadTime = int(de / dw2)	# Number of point during dead time
+
+if (gl1 < 0) or (gl1 > 1):
+	raise ValueError("gl1 must be between 0 and 1")
+if (gl2 < 0) or (gl2 > 1):
+	raise ValueError("gl2 must be between 0 and 1")
 
 # Axes
 timeT = np.linspace(0,acquiT,td2)
@@ -116,22 +123,26 @@ def signal_generation():
 		fin = (i+1)*halfEcho-dw2
 		timei = np.linspace(deb,fin,nbPtHalfEcho)
 		
-		# Gaussian broadening (t2star) with exponential relaxation (t2)
+		# Gaussian-Lorentzian broadening (t2star) with exponential relaxation (t2)
 		if(desc==True):
 			yi1 = np.exp(1j*2*np.pi*nu1*(timei[:]-deb)) \
-				* np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)				# Exponential
-#				* np.exp(-(timei[:]-deb)**2/(2*sigma1**2)) * np.exp(-(timei[:])/t21)	# Gaussian
+				* ((1-gl1)*np.exp(-(timei[:]-deb)/t21star) \
+				+ (gl1)*np.exp(-(timei[:]-deb)**2/(2*sigma1**2))) \
+				* np.exp(-(timei[:])/t21)
 			yi2 = np.exp(1j*2*np.pi*nu2*(timei[:]-deb)) \
-				* np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)				# Exponential
-#				* np.exp(-(timei[:]-deb)**2/(2*sigma2**2)) * np.exp(-(timei[:])/t21)	# Gaussian
+				* ((1-gl2)*np.exp(-(timei[:]-deb)/t22star) \
+				+ (gl2)*np.exp(-(timei[:]-deb)**2/(2*sigma2**2))) \
+				* np.exp(-(timei[:])/t21)
 #			yi2 = np.zeros(timei.size, dtype='complex')
 		else:
 			yi1 = np.exp(1j*2*np.pi*nu1*(-(fin+dw2)+timei[:])) \
-				* np.exp((-(fin+dw2)+timei[:])/t21star) * np.exp(-(timei[:])/t21)					# Exponential
-#				* np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2)) * np.exp(-(timei[:])/t21)	# Gaussian
+				* ((1-gl1)*np.exp((-(fin+dw2)+timei[:])/t21star) \
+				+ (gl1)*np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2))) \
+				* np.exp(-(timei[:])/t21)
 			yi2 = np.exp(1j*2*np.pi*nu2*(-(fin+dw2)+timei[:])) \
-				* np.exp((-(fin+dw2)+timei[:])/t22star) * np.exp(-(timei[:])/t22)					# Exponential
-#				* np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2)) * np.exp(-(timei[:])/t22)	# Gaussian
+				* ((1-gl2)*np.exp((-(fin+dw2)+timei[:])/t22star) \
+				+ (gl2)*np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2))) \
+				* np.exp(-(timei[:])/t22)
 #			yi2 = np.zeros(timei.size, dtype='complex')
 		yi = yi1 + yi2
 		desc = not(desc)
