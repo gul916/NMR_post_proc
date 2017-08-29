@@ -9,9 +9,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 # User defined libraries
-import signalTopspin as sig
-import svd_sfa as svd
-svd.svd_init()
+import NMRclass as sig
+import svd_auto
+svd_auto.svd_init()
 
 
 
@@ -142,7 +142,7 @@ def signal_processing(processedSig):
 
 	# Singular Value Decompostion (SVD) on Toeplitz matrix
 	if (SVD_method == 1):
-		echos1D = svd.svd(echos1D,SVD_method)
+		echos1D = svd_auto.svd(echos1D,SVD_method)
 
 
 
@@ -161,11 +161,11 @@ def signal_processing(processedSig):
 
 	# Singular Value Decompostion (SVD) on echo matrix
 	if (SVD_method == 2):
-		echos2D = svd.svd(echos2D,SVD_method)
+		echos2D = svd_auto.svd(echos2D,SVD_method)
 
 	# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
 	if (SVD_method == 3):
-		echos2D = svd.svd(echos2D,SVD_method)
+		echos2D = svd_auto.svd(echos2D,SVD_method)
 	
 	# For plotting
 	echos2Dsvd = echos2D.copy()

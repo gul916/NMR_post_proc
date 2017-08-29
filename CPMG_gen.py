@@ -9,7 +9,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 # User defined libraries
-import signalTopspin as sig
+import NMRclass as sig
 
 
 
