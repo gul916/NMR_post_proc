@@ -250,7 +250,7 @@ def signal_processing(processedSig):
 	#%% Figures
 	plt.ion()							# interactive mode on
 	
-	# FID
+	# Temporal data (FID)
 	fig1 = plt.figure()
 	fig1.suptitle("CPMG NMR signal processing", fontsize=16)
 	
@@ -283,7 +283,7 @@ def signal_processing(processedSig):
 
 
 
-	# SPC
+	# Spectral data (SPC)
 	fig2 = plt.figure()
 	fig2.suptitle("CPMG NMR signal processing", fontsize=16)
 	
@@ -302,14 +302,14 @@ def signal_processing(processedSig):
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("SPC after SVD and echo separation")
 	for i in range (0, nbFullEchoTotal,5):
-		ax3.plot(freqFullEcho[:],(echos2DsvdSPC[i,:]).imag)
+		ax3.plot(freqFullEcho[:],(echos2DsvdSPC[i,:]).real)
 #		print("\t1er elem du demi echo", 2*i ," =", echos2D[i, 0])
 #		print("\t1er elem du demi echo", 2*i+1 ," =", echos2D[i, nbPtHalfEcho])
 	ax3.invert_xaxis()
 	
 	ax4 = fig2.add_subplot(414)
 	ax4.set_title("SPC after ponderated sum")
-	ax4.plot(freqFullEcho[:],sommeFIDSPC[:].imag)
+	ax4.plot(freqFullEcho[:],sommeFIDSPC[:].real)
 #	ax4.plot(freqFullEcho[:],sommeFID[:].imag)
 	ax4.invert_xaxis()
 	

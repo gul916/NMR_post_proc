@@ -564,14 +564,14 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-	
 	svd_init(svd_tools_resolution_override)
 
+	# Data import
 	A = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
 	nbPtHalfEcho=104
 	nbHalfEcho=41
@@ -580,50 +580,15 @@ if __name__ == "__main__":
 	Amax = int((nbHalfEcho+1) * nbPtHalfEcho)
 	nbPtFreq = int(Amax * 4)
 	
-	
-	
 	# Raw data
 	A = A[:Amax,0] + 1j*A[:Amax,1]
-	ASPC = A[:nbPtHalfEcho]
-	ASPC[0] *= 0.5				# FFT artefact correction
-	ASPC = np.fft.fftshift(np.fft.fft(ASPC[:], nbPtFreq))
-
-	plt.ion()					# interactive mode on
-	fig1 = plt.figure()
-	fig1.suptitle("SVD processing", fontsize=16)
-
-	ax1 = fig1.add_subplot(411)
-	ax1.set_title("Raw FID")
-	ax1.plot(A[:].real)
-	
-	fig2 = plt.figure()
-	fig2.suptitle("SVD processing", fontsize=16)
-
-	ax1 = fig2.add_subplot(411)
-	ax1.set_title("Raw SPC")
-	ax1.invert_xaxis()
-	ax1.plot(ASPC[:].real)
+	Araw = A.copy()
 	
 	
-	
+	### SVD
 	# 1 : SVD applied on 1D data converted to Toeplitz matrix --> very long
 	svdMethod = 1
-	newA = svd(A,svdMethod)
-	
-	newASPC = newA[:nbPtHalfEcho]
-	newASPC[0] *= 0.5				# FFT artefact correction
-	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:], nbPtFreq))
-
-	ax2 = fig1.add_subplot(412)
-	ax2.set_title("Denoised FID with method 1")
-	ax2.plot(newA[:].real)
-	
-	ax2 = fig2.add_subplot(412)
-	ax2.set_title("Denoised SPC with method 1")
-	ax2.invert_xaxis()
-	ax2.plot(newASPC[:].real)
-	
-	
+	Ameth1 = svd(A,svdMethod)
 	
 	# Conversion to 2D
 	firstHalfEcho = np.zeros((nbPtHalfEcho), dtype=np.complex)
@@ -631,53 +596,90 @@ if __name__ == "__main__":
 	A = np.concatenate((firstHalfEcho[:],A[:Amax-nbPtHalfEcho]))
 	A = A.reshape(nbFullEchoTotal, 2*nbPtHalfEcho)
 	
-	
-	
 	# 2 : SVD applied on 2D data --> very fast
 	svdMethod = 2
-	newA = svd(A,svdMethod)
+	Ameth2 = svd(A,svdMethod)
 	
-	newASPC = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	newASPC[:,0] *= 0.5				# FFT artefact correction
-	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:,:], nbPtFreq))
+	# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
+	svdMethod = 3
+	Ameth3 = svd(A,svdMethod)
+	
+	
+	
+	#%% Spectra calculation
+	ArawSPC = Araw[:nbPtHalfEcho]
+	ArawSPC[0] *= 0.5				# FFT artefact correction
+	ArawSPC = np.fft.fftshift(np.fft.fft(ArawSPC[:], nbPtFreq))
+	
+	Ameth1SPC = Ameth1[:nbPtHalfEcho]
+	Ameth1SPC[0] *= 0.5				# FFT artefact correction
+	Ameth1SPC = np.fft.fftshift(np.fft.fft(Ameth1SPC[:], nbPtFreq))
+	
+	Ameth2SPC = Ameth2[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	Ameth2SPC[:,0] *= 0.5				# FFT artefact correction
+	Ameth2SPC = np.fft.fftshift(np.fft.fft(Ameth2SPC[:,:], nbPtFreq, \
+		axis=1), axes=1)
+	
+	Ameth3SPC = Ameth3[:,nbPtHalfEcho:2*nbPtHalfEcho]
+	Ameth3SPC[:,0] *= 0.5				# FFT artefact correction
+	Ameth3SPC = np.fft.fftshift(np.fft.fft(Ameth3SPC[:,:], nbPtFreq, \
+		axis=1), axes=1)
+	
+	
+	
+	#%% Figures
+	plt.ion()					# interactive mode on
+	
+	# Temporal data (FID)
+	fig1 = plt.figure()
+	fig1.suptitle("SVD processing", fontsize=16)
 
+	ax1 = fig1.add_subplot(411)
+	ax1.set_title("Raw FID")
+	ax1.plot(Araw[:].real)
+	
+	ax2 = fig1.add_subplot(412)
+	ax2.set_title("Denoised FID with method 1")
+	ax2.plot(Ameth1[:].real)
+	
 	ax3 = fig1.add_subplot(413)
 	ax3.set_title("Denoised FID with method 2")
 	for i in range (0,nbFullEchoTotal,5):
-		ax3.plot(newA[i,:].real)
+		ax3.plot(Ameth2[i,:].real)
+	
+	ax4 = fig1.add_subplot(414)
+	ax4.set_title("Denoised FID with method 3")
+	for i in range (0,nbFullEchoTotal,5):
+		ax4.plot(Ameth3[i,:].real)
+	
+	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
+	fig1.show()												# Display figure
+	
+	# Spectral data (SPC)
+	fig2 = plt.figure()
+	fig2.suptitle("SVD processing", fontsize=16)
+
+	ax1 = fig2.add_subplot(411)
+	ax1.set_title("Raw SPC")
+	ax1.invert_xaxis()
+	ax1.plot(ArawSPC[:].real)
+	
+	ax2 = fig2.add_subplot(412)
+	ax2.set_title("Denoised SPC with method 1")
+	ax2.invert_xaxis()
+	ax2.plot(Ameth1SPC[:].real)
 	
 	ax3 = fig2.add_subplot(413)
 	ax3.set_title("Denoised SPC with method 2")
 	ax3.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
-		ax3.plot(newASPC[i,:].real)
-	
-	
-	
-	# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
-	svdMethod = 3
-	newA = svd(A,svdMethod)
-	
-	newASPC = newA[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	newASPC[:,0] *= 0.5				# FFT artefact correction
-	newASPC = np.fft.fftshift(np.fft.fft(newASPC[:,:], nbPtFreq))
-
-	ax4 = fig1.add_subplot(414)
-	ax4.set_title("Denoised FID with method 3")
-	for i in range (0,nbFullEchoTotal,5):
-		ax4.plot(newA[i,:].real)
+		ax3.plot(Ameth2SPC[i,:].real)
 	
 	ax4 = fig2.add_subplot(414)
 	ax4.set_title("Denoised SPC with method 3")
 	ax4.invert_xaxis()
 	for i in range (0,nbFullEchoTotal,5):
-		ax4.plot(newASPC[i,:].real)
-
-
-
-		# Display figures
-	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-	fig1.show()												# Display figure
+		ax4.plot(Ameth3SPC[i,:].real)
 	
 	fig2.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
 	fig2.show()												# Display figure
