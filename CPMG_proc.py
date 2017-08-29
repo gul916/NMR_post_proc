@@ -157,8 +157,6 @@ def signal_processing(processedSig):
 #	print("\n 1er elem de chaque demi echo à la separation (reshape) des echos")
 	echos2D = echos1D.reshape(nbFullEchoTotal,nbPtFullEcho)
 
-
-
 	# Singular Value Decompostion (SVD) on echo matrix
 	if (SVD_method == 2):
 		echos2D = svd_auto.svd(echos2D,SVD_method)
@@ -167,6 +165,10 @@ def signal_processing(processedSig):
 	if (SVD_method == 3):
 		echos2D = svd_auto.svd(echos2D,SVD_method)
 	
+	# ponderation of first echo
+	if firstDec:
+		echos2D[0,:] *= 2
+
 	# For plotting
 	echos2Dsvd = echos2D.copy()
 

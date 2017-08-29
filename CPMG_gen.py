@@ -33,14 +33,16 @@ mean = 0
 std = 0.1
 
 # 1st frequency
+nu1 = 1750
 t21 = 500e-3
 t21star = 1e-3
-nu1 = 1750
+sigma1 = np.sqrt(2*np.log(2))*t21star;
 
 # 2nd frequency
+nu2 = -2500
 t22 = 100e-3
 t22star = 0.5e-3
-nu2 = -2500
+sigma2 = np.sqrt(2*np.log(2))*t22star;
 
 # Calculated
 halfEcho = fullEcho / 2
@@ -110,24 +112,27 @@ def signal_generation():
 	# print("\n 1er point de chaque demi echo à la creation : ")
 	# tracé de la courbe par les demi echos
 	for i in range (0, nbHalfEcho):
-
 		deb = i*halfEcho
 		fin = (i+1)*halfEcho-dw2
-
 		timei = np.linspace(deb,fin,nbPtHalfEcho)
-
+		
+		# Gaussian broadening (t2star) with exponential relaxation (t2)
 		if(desc==True):
 			yi1 = np.exp(1j*2*np.pi*nu1*(timei[:]-deb)) \
-				* np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)
+				* np.exp(-(timei[:]-deb)/t21star) * np.exp(-(timei[:])/t21)				# Exponential
+#				* np.exp(-(timei[:]-deb)**2/(2*sigma1**2)) * np.exp(-(timei[:])/t21)	# Gaussian
 			yi2 = np.exp(1j*2*np.pi*nu2*(timei[:]-deb)) \
-				* np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)
-	#		yi2 = np.zeros(timei.size, dtype='complex')
+				* np.exp(-(timei[:]-deb)/t22star) * np.exp(-(timei[:])/t22)				# Exponential
+#				* np.exp(-(timei[:]-deb)**2/(2*sigma2**2)) * np.exp(-(timei[:])/t21)	# Gaussian
+#			yi2 = np.zeros(timei.size, dtype='complex')
 		else:
 			yi1 = np.exp(1j*2*np.pi*nu1*(-(fin+dw2)+timei[:])) \
-				* np.exp((-(fin+dw2)+timei[:])/t21star) * np.exp(-(timei[:])/t21)
+				* np.exp((-(fin+dw2)+timei[:])/t21star) * np.exp(-(timei[:])/t21)					# Exponential
+#				* np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2)) * np.exp(-(timei[:])/t21)	# Gaussian
 			yi2 = np.exp(1j*2*np.pi*nu2*(-(fin+dw2)+timei[:])) \
-				* np.exp((-(fin+dw2)+timei[:])/t22star) * np.exp(-(timei[:])/t22)
-	#		yi2 = np.zeros(timei.size, dtype='complex')
+				* np.exp((-(fin+dw2)+timei[:])/t22star) * np.exp(-(timei[:])/t22)					# Exponential
+#				* np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2)) * np.exp(-(timei[:])/t22)	# Gaussian
+#			yi2 = np.zeros(timei.size, dtype='complex')
 		yi = yi1 + yi2
 		desc = not(desc)
 
