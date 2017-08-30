@@ -33,17 +33,19 @@ mean = 0
 std = 0.1
 
 # 1st frequency
-nu1 = 1750
-t21 = 500e-3
-t21star = 1e-3
-sigma1 = np.sqrt(2*np.log(2))*t21star
+amp1 = 1						# amplitude
+nu1 = 1750					# frequency in Hz
+t21 = 500e-3				# true relaxation time
+t21star = 1e-3				# apparent relaxation time
+sigma1 = np.sqrt(2*np.log(2))*t21star		# for Gaussian shape
 gl1 = 0						# 0: Lorentzian shape, 1: Gaussian shape
 
 # 2nd frequency
-nu2 = -2500
-t22 = 100e-3
-t22star = 0.5e-3
-sigma2 = np.sqrt(2*np.log(2))*t22star;
+amp2 = 1						# amplitude
+nu2 = -2500					# frequency in Hz
+t22 = 100e-3				# true relaxation time
+t22star = 0.5e-3			# apparent relaxation time
+sigma2 = np.sqrt(2*np.log(2))*t22star;		# for Gaussian shape
 gl2 = 0						# 0: Lorentzian shape, 1: Gaussian shape
 
 # Calculated
@@ -118,38 +120,30 @@ def signal_generation():
 	print("\n------------------------------------------------------------------------")
 	# print("\n 1er point de chaque demi echo à la creation : ")
 	# tracé de la courbe par les demi echos
+	
 	for i in range (0, nbHalfEcho):
 		deb = i*halfEcho
 		fin = (i+1)*halfEcho-dw2
 		timei = np.linspace(deb,fin,nbPtHalfEcho)
+		if(desc==True):
+			tzero = i*halfEcho
+		else:
+			tzero = (i+1)*halfEcho
 		
 		# Gaussian-Lorentzian broadening (t2star) with exponential relaxation (t2)
-		if(desc==True):
-			yi1 = np.exp(1j*2*np.pi*nu1*(timei[:]-deb)) \
-				* ((1-gl1)*np.exp(-(timei[:]-deb)/t21star) \
-				+ (gl1)*np.exp(-(timei[:]-deb)**2/(2*sigma1**2))) \
-				* np.exp(-(timei[:])/t21)
-			yi2 = np.exp(1j*2*np.pi*nu2*(timei[:]-deb)) \
-				* ((1-gl2)*np.exp(-(timei[:]-deb)/t22star) \
-				+ (gl2)*np.exp(-(timei[:]-deb)**2/(2*sigma2**2))) \
-				* np.exp(-(timei[:])/t21)
-#			yi2 = np.zeros(timei.size, dtype='complex')
-		else:
-			yi1 = np.exp(1j*2*np.pi*nu1*(-(fin+dw2)+timei[:])) \
-				* ((1-gl1)*np.exp((-(fin+dw2)+timei[:])/t21star) \
-				+ (gl1)*np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2))) \
-				* np.exp(-(timei[:])/t21)
-			yi2 = np.exp(1j*2*np.pi*nu2*(-(fin+dw2)+timei[:])) \
-				* ((1-gl2)*np.exp((-(fin+dw2)+timei[:])/t22star) \
-				+ (gl2)*np.exp(-(-(fin+dw2)+timei[:])**2/(2*sigma1**2))) \
-				* np.exp(-(timei[:])/t22)
-#			yi2 = np.zeros(timei.size, dtype='complex')
+		yi1 = amp1 * np.exp(1j*2*np.pi*nu1*(timei[:]-tzero)) \
+			* ((1-gl1)*np.exp(-abs(timei[:]-tzero)/t21star) \
+			+ (gl1)*np.exp(-(timei[:]-tzero)**2/(2*sigma1**2))) \
+			* np.exp(-(timei[:])/t21)
+		yi2 = amp2 * np.exp(1j*2*np.pi*nu2*(timei[:]-tzero)) \
+			* ((1-gl2)*np.exp(-abs(timei[:]-tzero)/t22star) \
+			+ (gl2)*np.exp(-(timei[:]-tzero)**2/(2*sigma2**2))) \
+			* np.exp(-(timei[:])/t21)
 		yi = yi1 + yi2
-		desc = not(desc)
-
 		# print("\t1er elem du demi echo", i ," =", yi[0])
 
 		Aref = np.concatenate((Aref[:],yi[:]))
+		desc = not(desc)
 
 	#print("\tAref.size =",Aref.size)
 	end = np.zeros(missingPts, dtype=np.complex)
@@ -183,18 +177,18 @@ def signal_generation():
 
 	#%% Figures
 	# Spectra calculation
-	ArefSpc = Aref.copy()					# Avoid reference FID corruption
-	ASpc = A.copy()						# Avoid noisy FID corruption
+	ArefSPC = Aref.copy()					# Avoid reference FID corruption
+	ASPC = A.copy()						# Avoid noisy FID corruption
 
 	if firstDec == True:
-		ArefSpc = ArefSpc[:nbPtHalfEcho] * nbHalfEcho
+		ArefSPC = ArefSPC[:nbPtHalfEcho] * nbHalfEcho
 	else:
-		ArefSpc = ArefSpc[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
+		ArefSPC = ArefSPC[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
 	
-	ArefSpc[0] *= 0.5						# FFT artefact correction
-	ASpc[0] *= 0.5
-	ArefSpc = np.fft.fftshift(np.fft.fft(ArefSpc[:], nbPtFreq))
-	ASpc = np.fft.fftshift(np.fft.fft(ASpc[:], nbPtFreq))	# FFT with zero filling
+	ArefSPC[0] *= 0.5						# FFT artefact correction
+	ASPC[0] *= 0.5
+	ArefSPC = np.fft.fftshift(np.fft.fft(ArefSPC[:], nbPtFreq))
+	ASPC = np.fft.fftshift(np.fft.fft(ASPC[:], nbPtFreq))	# FFT with zero filling
 
 	# Plotting
 	plt.ion()					# interactive mode on
@@ -226,8 +220,8 @@ def signal_generation():
 	ax4 = fig1.add_subplot(414)
 	ax4.set_title("Noisy SPC and reference SPC")
 	ax4.invert_xaxis()
-	ax4.plot(freq[:], ASpc.real)
-	ax4.plot(freq[:], ArefSpc.real)
+	ax4.plot(freq[:], ASPC.real)
+	ax4.plot(freq[:], ArefSPC.real)
 
 	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
 	fig1.show()								# Display figure
