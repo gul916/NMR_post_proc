@@ -8,7 +8,7 @@
 # Python libraries
 import matplotlib.pyplot as plt
 import numpy as np
-# User defined libraries
+# User defined library
 import NMRclass as sig
 
 
@@ -266,4 +266,4 @@ if __name__ == "__main__":
 	
 	
 	
-	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
+	input('\nPress enter key to exit') # wait before closing terminal

@@ -10,6 +10,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg
+import sys
 from time import time
 
 
@@ -106,7 +107,7 @@ def svd_init(override=svd_tools_resolution_override):
 	scipyOK = False
 
 	print("\n------------------------------------------------------------------------")
-	print('File : svd_sfa.py')
+	print('File : svd_auto.py')
 	print("------------------------------------------------------------------------\n")
 
 	print('Establishing modules to import / Importing')
@@ -564,15 +565,11 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 
 
 
-#%%----------------------------------------------------------------------------
-### When this file is executed directly
-###----------------------------------------------------------------------------
-
-if __name__ == "__main__":
-	svd_init(svd_tools_resolution_override)
-
+#%% Function to run when no argument is provided
+def svd_csv():
 	# Data import
 	A = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
+	firstDec = True
 	nbPtHalfEcho=104
 	nbHalfEcho=41
 	nbFullEchoTotal = int((nbHalfEcho+1)/2)
@@ -603,6 +600,11 @@ if __name__ == "__main__":
 	# 3 : SVD applied on slices of 2D data converted to Toeplitz matrix --> fast
 	svdMethod = 3
 	Ameth3 = svd(A,svdMethod)
+	
+	# ponderation of first echo
+	if firstDec:
+		Ameth2[0,:] *= 2
+#		Ameth3[0,:] *= 2
 	
 	
 	
@@ -686,4 +688,98 @@ if __name__ == "__main__":
 
 
 
-	input('\nPress enter key to exit') # have the graphs stay displayed even when launched from linux terminal
+#%% Function to run when a data set is provided as argument
+def svd_nmrglue(direc, overwrite=1):
+	# Python libraries
+	import nmrglue as ng
+	# User defined library
+	import NMRclass as sig
+
+	params, A = ng.bruker.read(direc)					# import data
+	
+	if A.ndim ==1:
+		td = params.get('acqus',{}).get('TD')
+		dw = 1/(2*params.get('acqus',{}).get('SW_h'))
+		de = params.get('acqus',{}).get('DE')
+		nbPtFreq = td * 4
+		
+		# Saving data to Signal class
+		generatedSignal = sig.Signal()
+		generatedSignal.setValues_topspin(td,dw,de)
+		generatedSignal.setData(A)
+		
+		# SVD
+		svdMethod = 1
+		Ameth1 = svd(A,svdMethod)
+		
+		# Spectra calculation
+		ASPC = A.copy()
+		ASPC[0] *= 0.5						# FFT artefact correction
+		ASPC = np.fft.fftshift(np.fft.fft(ASPC[:], nbPtFreq))
+		
+		Ameth1SPC = Ameth1[:].copy()
+		Ameth1SPC[0] *= 0.5				# FFT artefact correction
+		Ameth1SPC = np.fft.fftshift(np.fft.fft(Ameth1SPC[:], nbPtFreq))
+
+		# Figures
+		plt.ion()							# interactive mode on
+		fig1 = plt.figure()
+		fig1.suptitle("SVD processing", fontsize=16)
+	
+		ax1 = fig1.add_subplot(411)
+		ax1.set_title("Raw FID")
+		ax1.plot(A[:].real)
+		
+		ax2 = fig1.add_subplot(412)
+		ax2.set_title("Denoised FID with method 1")
+		ax2.plot(Ameth1[:].real)
+		
+		ax3 = fig1.add_subplot(413)
+		ax3.set_title("Raw SPC")
+		ax3.invert_xaxis()
+		ax3.plot(ASPC[:].real)
+		
+		ax4 = fig1.add_subplot(414)
+		ax4.set_title("Denoised SPC with method 1")
+		ax4.invert_xaxis()
+		ax4.plot(Ameth1SPC[:].real)
+		
+		fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
+		fig1.show()							# Display figure
+
+	else:
+		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
+	
+	if overwrite != 1:
+		direc += "-copy"
+	
+	ng.bruker.write(direc, params, A)					# export data
+	print("Data saved to", direc)
+
+
+
+#%%----------------------------------------------------------------------------
+### When this file is executed directly
+###----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+	svd_init(svd_tools_resolution_override)
+
+	try:
+		if len(sys.argv) == 1:
+			svd_csv()
+		if len(sys.argv) == 2:
+			data_dir = sys.argv[1]
+			svd_nmrglue(data_dir, overwrite=0)
+		elif len(sys.argv) >= 3:
+			raise NotImplementedError("There should be only one argument.")
+	
+	except NotImplementedError as err:
+		print("Error:", err)
+		for i in range(0, len(sys.argv)):
+			print("Argument", i, '=', sys.argv[i])
+	except OSError as err:
+		print("Error:", err)
+
+
+	input('\nPress enter key to exit') # wait before closing terminal

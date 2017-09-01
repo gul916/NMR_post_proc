@@ -5,30 +5,45 @@ import matplotlib.pyplot as plt
 import nmrglue as ng
 import sys
 
-def load_data(direc):
-	par, sig = ng.bruker.read(direc)
-	return par, sig
+def test_nmrglue(direc):
+	params, A = ng.bruker.read(direc)		# import data
+	
+	if A.ndim ==1:
+		plt.plot(A.real)
+	elif A.ndim ==2:
+		plt.contour(A.real)
+	else:
+		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
+	
+	direc += "-copy"
+	ng.bruker.write(direc, params, A)		# export data
+	print("Data saved to", direc)
 
-def export_data(direc, par, sig):
-	ng.bruker.write(direc, par, sig)
 
-try:
-	data_dir = sys.argv[1]
-	if len(sys.argv) > 2:
-		raise NotImplementedError("There should be only one argument.")
 
-	params, signal = load_data(data_dir)
-	plt.plot(signal.real)
-	data_dir2 = data_dir + "-copie"
-	export_data(data_dir2, params, signal)
+#%%----------------------------------------------------------------------------
+### When this file is executed directly
+###----------------------------------------------------------------------------
 
-except IndexError:
-	print("Error: Please enter the directory of the Bruker file.")
-except NotImplementedError as err:
-	print("Error:", err)
-	for i in range(1, len(sys.argv)):
-		print("Argument", i, '=', sys.argv[i])
-except OSError as err:
-	print("Error:", err)
-except:
-	print("An unknown error occured")
+if __name__ == "__main__":
+	try:
+		if len(sys.argv) == 1:
+			raise NotImplementedError("Please enter the directory of the Bruker file.")
+		elif len(sys.argv) == 2:
+			data_dir = sys.argv[1]
+			test_nmrglue(data_dir)
+		elif len(sys.argv) >= 3:
+			raise NotImplementedError("There should be only one argument.")
+	
+	except NotImplementedError as err:
+		print("Error:", err)
+		for i in range(0, len(sys.argv)):
+			print("Argument", i, '=', sys.argv[i])
+	except OSError as err:
+		print("Error:", err)
+	else:		# When no error occured
+		print("\nNMRglue read and write successfully tested")
+	
+	
+	
+	input("Press enter key to exit") # wait before closing terminal
