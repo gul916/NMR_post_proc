@@ -44,7 +44,7 @@ modulesCheck = [svd_tools_resolution_override,arrayfireOK,skcudaOK,scipyOK,initC
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### SVD tools importation
 ###----------------------------------------------------------------------------
 
@@ -96,7 +96,7 @@ def import_scipy():
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### SVD tools resolution
 ###----------------------------------------------------------------------------
 
@@ -223,7 +223,7 @@ def svd_preliminary_operations(setSVDTools):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### svd_decomposition
 ###----------------------------------------------------------------------------
 
@@ -260,7 +260,7 @@ def svd_decomposition(mat, choice):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### THRESHOLDING METHODS
 ###----------------------------------------------------------------------------
 
@@ -355,7 +355,7 @@ def slMethod(s,m,n,max_err):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### svd_reconstruction
 ###----------------------------------------------------------------------------
 
@@ -397,7 +397,7 @@ def svd_reconstruction(U, s_gpu, Vh, thres, choice):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### SVD THRESHOLD
 ###----------------------------------------------------------------------------
 
@@ -463,7 +463,7 @@ def svd_thres(data,svdTools,thresMethod='SL',max_err=5):
 
 
 
-###----------------------------------------------------------------------------
+#%%----------------------------------------------------------------------------
 ### MAIN SVD METHOD
 ###----------------------------------------------------------------------------
 
@@ -517,7 +517,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 					mat = linalg.toeplitz(data64[row-1::-1], data64[row-1::1])
 					data_rec = np.empty([nbPtSignal],dtype='complex64')
 					
-					print("SVD on 1D data converted to Toeplitz matrix in progress.")
+					print("SVD in progress on 1D data converted to Toeplitz matrix.")
 					print("Please be patient.")
 					mat_rec, thres = svd_thres(mat,svdTools,thresMethod,max_err)
 					for i in range (0, nbPtSignal):
@@ -527,7 +527,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 					
 				elif svdMethod == 2:
 					# Singular Value Decompostion (SVD) on echo matrix
-					print("SVD on 2D data in progress. Please be patient.")
+					print("SVD in progress on 2D data. Please be patient.")
 
 					data_rec, thres = svd_thres(data64,svdTools,thresMethod,max_err)
 
@@ -535,7 +535,7 @@ def svd(data,svdMethod=0,thresMethod='SL',max_err=5):
 
 				elif svdMethod == 3:
 					# Singular Value Decompostion (SVD) on Toeplitz matrix of each echo
-					print("SVD on slices of 2D data converted to Toeplitz matrix in progress.")
+					print("SVD in progress on slices of 2D data converted to Toeplitz matrix.")
 					print("Please be patient.")
 
 					nslices, nbPtSlice = data64.shape
@@ -608,7 +608,7 @@ def svd_csv():
 	
 	
 	
-	#%% Spectra calculation
+	# Spectra calculation
 	ArawSPC = Araw[:nbPtHalfEcho]
 	ArawSPC[0] *= 0.5				# FFT artefact correction
 	ArawSPC = np.fft.fftshift(np.fft.fft(ArawSPC[:], nbPtFreq))
@@ -629,7 +629,7 @@ def svd_csv():
 	
 	
 	
-	#%% Figures
+	# Figures
 	plt.ion()					# interactive mode on
 	
 	# Temporal data (FID)
@@ -689,24 +689,18 @@ def svd_csv():
 
 
 #%% Function to run when a data set is provided as argument
-def svd_nmrglue(direc, overwrite=1):
-	# Python libraries
+def svd_nmrglue(direc, overwrite=0):
+	# Python library
 	import nmrglue as ng
 	# User defined library
-	import NMRclass as sig
 
-	params, A = ng.bruker.read(direc)					# import data
+	params, A = ng.bruker.read(direc)				# import data
 	
 	if A.ndim ==1:
-		td = params.get('acqus',{}).get('TD')
-		dw = 1/(2*params.get('acqus',{}).get('SW_h'))
-		de = params.get('acqus',{}).get('DE')
+		td = params['acqus']['TD']						# Dictionnary of dictionnaries
+#		dw = 1/(2*params['acqus']['SW_h'])
+#		de = params['acqus']['DE']
 		nbPtFreq = td * 4
-		
-		# Saving data to Signal class
-		generatedSignal = sig.Signal()
-		generatedSignal.setValues_topspin(td,dw,de)
-		generatedSignal.setData(A)
 		
 		# SVD
 		svdMethod = 1

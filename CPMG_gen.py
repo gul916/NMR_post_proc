@@ -167,15 +167,7 @@ def signal_generation():
 
 
 
-	# Saving data to Signal class
-	generatedSignal = sig.Signal()
-	generatedSignal.setValues_topspin(td,dw,de)
-	generatedSignal.setValues_user(firstDec,fullEcho,nbEcho)
-	generatedSignal.setData(A)
-
-
-
-	#%% Figures
+	# Figures
 	# Spectra calculation
 	ArefSPC = Aref.copy()					# Avoid reference FID corruption
 	ASPC = A.copy()						# Avoid noisy FID corruption
@@ -228,7 +220,14 @@ def signal_generation():
 
 
 
+	# Saving data to Signal class
+	generatedSignal = sig.Signal()
+	generatedSignal.setValues_topspin(td,dw,de)
+	generatedSignal.setValues_CPMG(firstDec,fullEcho,nbEcho)
+	generatedSignal.setData(A)
+
 	return generatedSignal
+
 
 
 #%%----------------------------------------------------------------------------

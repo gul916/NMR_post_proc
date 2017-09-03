@@ -190,42 +190,28 @@ class Signal:
 			self._topspinInitialised = True
 
 
-	def setValues_user(self,newfirstDec,newfullEcho,newnbEcho):
-		if not self._topspinInitialised:
-			raise ValueError("You must set topsin values with setValues_topspin() first !")
+	def setValues_CPMG(self,newfirstDec,newfullEcho,newnbEcho):
 		try:
+			if not self._topspinInitialised:
+				raise ValueError("You must set topsin values with setValues_topspin() first !")
 			self.firstDec = newfirstDec
 			self.fullEcho = newfullEcho
 			self.nbEcho = newnbEcho
 			self.set_dureeSignal()
+			self.set_nbPtHalfEcho()
+			self.set_nbPtSignal()
+			self.set_missingPts()
 		except ValueError as err:
-			print("function setValues_user() returns error :")
+			print("function setValues_CPMG() returns error :")
 			print("  ",err.args[0])
 			print()
 		else:
 			self._userInitialised = True
 
 
-	def checkInitialisation(self):
-		if not self._topspinInitialised:
-			raise ValueError("You must set topsin values with setValues_topspin() first !")
-		elif not self._userInitialised:
-			raise ValueError("You must set user values with setValues_user() first !")
-
-	
 	def _get_data(self):
 		return self._data
 	data = property(_get_data)
 	def setData(self,newdata):
-		try:
-			self.checkInitialisation()
-			self.set_nbPtHalfEcho()
-			self.set_nbPtSignal()
-			self.set_missingPts()
-		except ValueError as err:
-			print("function setData() returns error :")
-			print("  ",err.args[0])
-			print()
-		else:
-			self._data = newdata
+		self._data = newdata
 	

@@ -346,7 +346,7 @@ if __name__ == "__main__":
 		# Saving data to Signal class
 		rawFID = sig.Signal()
 		rawFID.setValues_topspin(A_td,A_dw,A_de)
-		rawFID.setValues_user(A_firstDec,A_fullEcho,A_nbEcho)
+		rawFID.setValues_CPMG(A_firstDec,A_fullEcho,A_nbEcho)
 		rawFID.setData(A_data)
 	else:
 		print("Additional arguments are not yet supported")
