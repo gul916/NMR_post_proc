@@ -1,49 +1,31 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import matplotlib.pyplot as plt
-import nmrglue as ng
-import sys
+import subprocess
+from CPython_init import CPYTHON_LOCATION, CPYTHON_FILES_LOCATION
 
-def test_nmrglue(direc):
-	params, A = ng.bruker.read(direc)		# import data
-	
-	if A.ndim ==1:
-		plt.plot(A.real)
-	elif A.ndim ==2:
-		plt.contour(A.real)
-	else:
-		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
-	
-	direc += "-copy"
-	ng.bruker.write(direc, params, A)		# export data
-	print("Data saved to", direc)
+script = CPYTHON_FILES_LOCATION + "print.py"
 
 
+result=INPUT_DIALOG("CPMG PARAMETERS", 
+  """ please provide the full echo duration FED (milliseconds),
+   the number of echoes nbE
+   and specify if there is a first decay (yes : 1 / no : 0)..""", 
+     ["FED=","nbE=", "first decay : "])
+(fullEcho,nbEcho,FD)=(result[0],result[1],result[2])
 
-#%%----------------------------------------------------------------------------
-### When this file is executed directly
-###----------------------------------------------------------------------------
+dataset=CURDATA()
+print(dataset)
+def fullpath(dataset):
+	# function coded by Julien TRÉBOSC
+	# original code : https://github.com/jtrebosc/JTutils/blob/master/TSpy/qcpmgadd.py
+	dat=dataset[:] # make a copy because I don't want to modify the original array
+	if len(dat)==5: # for topspin 2-
+	        dat[3]="%s/data/%s/nmr" % (dat[3],dat[4])
+	#fulldata="%s/%s/%s/pdata/%s/" % (dat[3],dat[0],dat[1],dat[2])
+	fulldata="%s/%s/%s/" % (dat[3],dat[0],dat[1])
+	return fulldata
 
-if __name__ == "__main__":
-	try:
-		if len(sys.argv) == 1:
-			raise NotImplementedError("Please enter the directory of the Bruker file.")
-		elif len(sys.argv) == 2:
-			data_dir = sys.argv[1]
-			test_nmrglue(data_dir)
-		elif len(sys.argv) >= 3:
-			raise NotImplementedError("There should be only one argument.")
-	
-	except NotImplementedError as err:
-		print("Error:", err)
-		for i in range(0, len(sys.argv)):
-			print("Argument", i, '=', sys.argv[i])
-	except OSError as err:
-		print("Error:", err)
-	else:		# When no error occured
-		print("\nNMRglue read and write successfully tested")
-	
-	
-	
-	input("Press enter key to exit") # wait before closing terminal
+fulldataPATH=fullpath(dataset)
+print(fulldataPATH)
+
+subprocess.call([CPYTHON_LOCATION]+[script]+[fulldataPATH]+[fullEcho]+[nbEcho]+[FD])

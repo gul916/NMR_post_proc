@@ -30,7 +30,7 @@ de = 96e-6					# dead time before signal acquisition
 
 # Simulation of noise
 mean = 0
-std = 0.1
+std = 0.3
 
 # 1st frequency
 amp1 = 1						# amplitude
