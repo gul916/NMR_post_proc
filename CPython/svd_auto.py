@@ -610,28 +610,26 @@ def svd_csv():
 	
 	# Spectra calculation
 	ArawSPC = Araw[:nbPtHalfEcho]
-	ArawSPC[0] *= 0.5				# FFT artefact correction
+	ArawSPC[0] *= 0.5								# FFT artefact correction
 	ArawSPC = np.fft.fftshift(np.fft.fft(ArawSPC[:], nbPtFreq))
 	
 	Ameth1SPC = Ameth1[:nbPtHalfEcho]
-	Ameth1SPC[0] *= 0.5				# FFT artefact correction
+	Ameth1SPC[0] *= 0.5							# FFT artefact correction
 	Ameth1SPC = np.fft.fftshift(np.fft.fft(Ameth1SPC[:], nbPtFreq))
 	
 	Ameth2SPC = Ameth2[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	Ameth2SPC[:,0] *= 0.5				# FFT artefact correction
+	Ameth2SPC[:,0] *= 0.5							# FFT artefact correction
 	Ameth2SPC = np.fft.fftshift(np.fft.fft(Ameth2SPC[:,:], nbPtFreq, \
 		axis=1), axes=1)
 	
 	Ameth3SPC = Ameth3[:,nbPtHalfEcho:2*nbPtHalfEcho]
-	Ameth3SPC[:,0] *= 0.5				# FFT artefact correction
+	Ameth3SPC[:,0] *= 0.5							# FFT artefact correction
 	Ameth3SPC = np.fft.fftshift(np.fft.fft(Ameth3SPC[:,:], nbPtFreq, \
 		axis=1), axes=1)
 	
 	
 	
 	# Figures
-	plt.ion()					# interactive mode on
-	
 	# Temporal data (FID)
 	fig1 = plt.figure()
 	fig1.suptitle("SVD processing", fontsize=16)
@@ -655,7 +653,8 @@ def svd_csv():
 		ax4.plot(Ameth3[i,:].real)
 	
 	fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-	fig1.show()												# Display figure
+	plt.ion()										# Interactive mode on
+	plt.show()										# Display figure
 	
 	# Spectral data (SPC)
 	fig2 = plt.figure()
@@ -684,7 +683,8 @@ def svd_csv():
 		ax4.plot(Ameth3SPC[i,:].real)
 	
 	fig2.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-	fig2.show()												# Display figure
+	plt.ioff()										# Interactive mode off
+	plt.show()										# Display figure
 
 
 
@@ -692,12 +692,11 @@ def svd_csv():
 def svd_nmrglue(direc, overwrite=0):
 	# Python library
 	import nmrglue as ng
-	# User defined library
 
 	params, A = ng.bruker.read(direc)				# import data
 	
-	if A.ndim ==1:
-		td = params['acqus']['TD']						# Dictionnary of dictionnaries
+	if A.ndim == 1:
+		td = params['acqus']['TD']					# Dictionnary of dictionnaries
 #		dw = 1/(2*params['acqus']['SW_h'])
 #		de = params['acqus']['DE']
 		nbPtFreq = td * 4
@@ -708,15 +707,14 @@ def svd_nmrglue(direc, overwrite=0):
 		
 		# Spectra calculation
 		ASPC = A.copy()
-		ASPC[0] *= 0.5						# FFT artefact correction
+		ASPC[0] *= 0.5								# FFT artefact correction
 		ASPC = np.fft.fftshift(np.fft.fft(ASPC[:], nbPtFreq))
 		
 		Ameth1SPC = Ameth1[:].copy()
-		Ameth1SPC[0] *= 0.5				# FFT artefact correction
+		Ameth1SPC[0] *= 0.5						# FFT artefact correction
 		Ameth1SPC = np.fft.fftshift(np.fft.fft(Ameth1SPC[:], nbPtFreq))
 
 		# Figures
-		plt.ion()							# interactive mode on
 		fig1 = plt.figure()
 		fig1.suptitle("SVD processing", fontsize=16)
 	
@@ -738,16 +736,19 @@ def svd_nmrglue(direc, overwrite=0):
 		ax4.invert_xaxis()
 		ax4.plot(Ameth1SPC[:].real)
 		
-		fig1.tight_layout(rect=[0, 0, 1, 0.95])		# Avoid superpositions on display
-		fig1.show()							# Display figure
+		fig1.tight_layout(rect=[0, 0, 1, 0.95])	# Avoid superpositions on display
+		plt.ioff()									# Interactive mode off
+		plt.show()									# Display figure without closing
 
 	else:
 		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
 	
 	if overwrite != 1:
 		direc += "-copy"
+		ng.bruker.write(direc, params, Ameth1, overwrite=False)	# export data
+	else:
+		ng.bruker.write(direc, params, Ameth1, overwrite=True)	# export data
 	
-	ng.bruker.write(direc, params, A)					# export data
 	print("Data saved to", direc)
 
 
@@ -757,6 +758,7 @@ def svd_nmrglue(direc, overwrite=0):
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+	print()											# Line jump
 	svd_init(svd_tools_resolution_override)
 
 	try:
@@ -764,7 +766,7 @@ if __name__ == "__main__":
 			svd_csv()
 		if len(sys.argv) == 2:
 			data_dir = sys.argv[1]
-			svd_nmrglue(data_dir, overwrite=0)
+			svd_nmrglue(data_dir, overwrite=1)
 		elif len(sys.argv) >= 3:
 			raise NotImplementedError("There should be only one argument.")
 	
@@ -772,8 +774,6 @@ if __name__ == "__main__":
 		print("Error:", err)
 		for i in range(0, len(sys.argv)):
 			print("Argument", i, '=', sys.argv[i])
+	
 	except OSError as err:
 		print("Error:", err)
-
-
-	input('\nPress enter key to exit') # wait before closing terminal

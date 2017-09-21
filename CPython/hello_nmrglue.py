@@ -10,7 +10,6 @@ import sys
 def test_nmrglue(data_dir):
 	dic, data = ng.bruker.read_pdata(data_dir)		# import data
 	udic = ng.bruker.guess_udic(dic, data)	# convert to universal dictionary
-	plt.ion()									# interactive mode on
 	
 	if data.ndim == 1:
 		uc = ng.fileiobase.uc_from_udic(udic)
@@ -38,7 +37,7 @@ def test_nmrglue(data_dir):
 	else:
 		raise NotImplementedError("Data of", data.ndim, "dimensions are not yet supported.")
 	
-	plt.ioff()									# interactive mode off
+	plt.ioff()									# Interactive mode off
 	plt.show()
 
 
@@ -47,6 +46,8 @@ def test_nmrglue(data_dir):
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+	print()										# Line jump
+	
 	try:
 		if len(sys.argv) == 1:
 			raise NotImplementedError("Please enter the directory of the Bruker file.")
