@@ -689,7 +689,7 @@ def svd_csv():
 
 
 #%% Function to run when a data set is provided as argument
-def svd_nmrglue(direc, overwrite=0):
+def svd_nmrglue(direc, over=False):
 	# Python library
 	import nmrglue as ng
 
@@ -743,12 +743,11 @@ def svd_nmrglue(direc, overwrite=0):
 	else:
 		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
 	
-	if overwrite != 1:
-		direc += "-copy"
-		ng.bruker.write(direc, params, Ameth1, overwrite=False)	# export data
-	else:
-		ng.bruker.write(direc, params, Ameth1, overwrite=True)	# export data
-	
+	if over != True:
+		over = False
+		direc += '-copy'
+
+	ng.bruker.write(direc, params, Ameth1, overwrite=over)	# export data
 	print("Data saved to", direc)
 
 
@@ -764,11 +763,21 @@ if __name__ == "__main__":
 	try:
 		if len(sys.argv) == 1:
 			svd_csv()
+			
 		if len(sys.argv) == 2:
 			data_dir = sys.argv[1]
-			svd_nmrglue(data_dir, overwrite=1)
-		elif len(sys.argv) >= 3:
-			raise NotImplementedError("There should be only one argument.")
+			svd_nmrglue(data_dir, over=False)
+			
+		if len(sys.argv) == 3:
+			data_dir = sys.argv[1]
+			if sys.argv[2] == 'True':
+				over = True							# convert string to boolean
+			else:
+				over = False
+			svd_nmrglue(data_dir, over)
+			
+		elif len(sys.argv) >= 4:
+			raise NotImplementedError("There should be maximum two arguments.")
 	
 	except NotImplementedError as err:
 		print("Error:", err)

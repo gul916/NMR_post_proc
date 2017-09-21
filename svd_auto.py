@@ -16,10 +16,12 @@ def fullpath(dataset):
 fulldataPATH = fullpath(dataset)
 
 # Confirmation dialog
-if CONFIRM("Warning", "Overwrite raw data?") == 0:
+if CONFIRM("Warning", "Overwrite current raw data?") == 0:
 	EXIT()
+else:
+	confirmTS = 'True'
 
 # Call to standard python
 FILE = 'svd_auto.py'
 script = CPYTHON_LIB + FILE
-subprocess.call([CPYTHON_BIN] + [script] + [fulldataPATH])
+subprocess.call([CPYTHON_BIN] + [script] + [fulldataPATH] + [confirmTS])
