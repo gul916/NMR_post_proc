@@ -1,4 +1,6 @@
 # Jython for Topspin
+# -*- coding: utf-8 -*-
+
 
 # Path to CPython executable
 CPYTHON_BIN = '/opt/anaconda3/bin/python3'

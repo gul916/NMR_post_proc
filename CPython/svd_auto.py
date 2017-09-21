@@ -738,7 +738,7 @@ def svd_nmrglue(direc, overwrite=0):
 		
 		fig1.tight_layout(rect=[0, 0, 1, 0.95])	# Avoid superpositions on display
 		plt.ioff()									# Interactive mode off
-		plt.show()									# Display figure without closing
+		plt.show()									# Display figure
 
 	else:
 		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")

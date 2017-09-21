@@ -1,5 +1,7 @@
 # Jython for Topspin
+# -*- coding: utf-8 -*-
 # Please use slash (/) rather than backslash (\)
+
 
 # Path to CPython executable
 CPYTHON_BIN = 'C:/ProgramData/Anaconda3/python.exe'

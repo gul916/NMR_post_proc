@@ -1,4 +1,4 @@
-# Jython  for Topspin
+# Jython for Topspin
 # -*- coding: utf-8 -*-
 
 from CPython_init import CPYTHON_BIN, CPYTHON_LIB
