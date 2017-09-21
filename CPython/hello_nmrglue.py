@@ -3,22 +3,43 @@
 
 import matplotlib.pyplot as plt
 import nmrglue as ng
+import numpy as np
 import sys
 
-def test_nmrglue(direc):
-	params, A = ng.bruker.read(direc)		# import data
-	
-	if A.ndim ==1:
-		plt.plot(A.real)
-	elif A.ndim ==2:
-		plt.contour(A.real)
-	else:
-		raise NotImplementedError("Data of", A.ndim, "dimensions are not yet supported.")
-	
-	direc += "-copy"
-	ng.bruker.write(direc, params, A)		# export data
-	print("Data saved to", direc)
 
+def test_nmrglue(data_dir):
+	dic, data = ng.bruker.read_pdata(data_dir)		# import data
+	udic = ng.bruker.guess_udic(dic, data)	# convert to universal dictionary
+	plt.ion()									# interactive mode on
+	
+	if data.ndim == 1:
+		uc = ng.fileiobase.uc_from_udic(udic)
+		ppm_scale = uc.ppm_scale()
+		
+		plt.plot(ppm_scale, data.real)
+		plt.gca().invert_xaxis()
+	
+	elif data.ndim == 2:
+		uc_dim1 = ng.fileiobase.uc_from_udic(udic, dim=1)
+		ppm_dim1 = uc_dim1.ppm_scale()
+		
+		uc_dim0 = ng.fileiobase.uc_from_udic(udic, dim=0)
+		ppm_dim0 = uc_dim0.ppm_scale()
+		
+		lev0 = 0.05 * np.amax(data.real)
+		toplev = 0.95 * np.amax(data.real)
+		nlev = 15
+		levels = np.linspace(lev0, toplev, nlev)
+		
+		plt.contour(ppm_dim1, ppm_dim0, data.real, levels)
+		plt.gca().invert_yaxis()
+		plt.gca().invert_xaxis()
+	
+	else:
+		raise NotImplementedError("Data of", data.ndim, "dimensions are not yet supported.")
+	
+	plt.ioff()									# interactive mode off
+	plt.show()
 
 
 #%%----------------------------------------------------------------------------
@@ -42,8 +63,4 @@ if __name__ == "__main__":
 	except OSError as err:
 		print("Error:", err)
 	else:		# When no error occured
-		print("\nNMRglue read and write successfully tested")
-	
-	
-	
-	input("Press enter key to exit") # wait before closing terminal
+		print("NMRglue successfully tested")
