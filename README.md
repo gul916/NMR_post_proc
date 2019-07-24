@@ -12,7 +12,7 @@ Two kinds of files are present in this repository :
 ### Prerequisites
 - Install Bruker Topspin
 - Install Anaconda Python. It uses Intel MKL library which is especially fast.
-- Install nmrglue : conda install -c fernandezc nmrglue 
+- Install nmrglue : pip install nmrglue-0.7-py2.py3-none-any.whl
 
 
 ### Installation under windows
@@ -20,8 +20,8 @@ Two kinds of files are present in this repository :
 - Extract NMR_post_proc.zip into the desired directory.
 - Modify CPython_init_windows.py according to Anaconda and NMR_post_proc directories.
 - Copy CPython_init_windows.py as CPython_init.py and move it into
-'C:\Bruker\TopSpin3.5pl7\exp\stan\nmr\py\user'.
-- In Topspin, click on Manage tab and preferences button, locate 'Manage source directories for edpul, edau, etc.' in Directories section and click on 'Change'. Select 'Python Programs', and add NMR_post_proc directory.
+'C:\Bruker\TopSpin3.6.1\exp\stan\nmr\py\user'.
+- In Topspin, click on Manage tab and preferences button, locate Directories section, "Manage source directories for edpul, edau, etc." and click on "Change". Select "Python Programs", and add NMR_post_proc directory.
 - Restart Topspin.
 
 
@@ -30,8 +30,8 @@ Two kinds of files are present in this repository :
 - Extract NMR_post_proc.zip into the desired directory.
 - Modify CPython_init_linux.py according to Anaconda and NMR_post_proc directories.
 - Copy CPython_init_linux.py as CPython_init.py and move it into
-/opt/Bruker/TopSpin3.5pl7/exp/stan/nmr/py/user.
-- In Topspin, click on Manage tab and preferences button, locate "Directories/Manage source directories for edpul, edau, etc." and click on "Change". Select "Python Programs", and add NMR_post_proc directory.
+/opt/Bruker/TopSpin3.6.1/exp/stan/nmr/py/user.
+- In Topspin, click on Manage tab and preferences button, locate Directories section, "Manage source directories for edpul, edau, etc." and click on "Change". Select "Python Programs", and add NMR_post_proc directory.
 - Restart Topspin.
 
 
