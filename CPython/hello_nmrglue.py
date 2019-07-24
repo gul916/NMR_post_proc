@@ -41,7 +41,6 @@ def test_nmrglue(data_dir):
 
 def main():
     print('\n\n\n---------------------------------------------')    # line jump
-    
     try:
         if len(sys.argv) == 1:
             raise NotImplementedError("Please enter the directory of the Bruker file.")
@@ -59,7 +58,6 @@ def main():
         print("Error:", err)
     else:                                           # When no error occured
         print("NMRglue successfully tested")
-    
     print('---------------------------------------------')          # line jump
 
 #%%----------------------------------------------------------------------------
