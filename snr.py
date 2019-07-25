@@ -15,7 +15,15 @@ def fullpath(dataset):
 dataset = CURDATA()
 fulldataPATH = fullpath(dataset)
 
+# Get signal and noise regions
+sig_lim_1 = GETPAR2('SIGF1')
+sig_lim_2 = GETPAR2('SIGF2')
+nois_lim_1 = GETPAR2('NOISF1')
+nois_lim_2 = GETPAR2('NOISF2')
+
 # Call to standard python
 FILE = 'snr.py'
 CPYTHON_FILE = CPYTHON_LIB + FILE
-subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE + ' ' + fulldataPATH)
+subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE + ' ' + fulldataPATH \
+                 + ' ' + sig_lim_1 + ' ' + sig_lim_2 \
+                 + ' ' + nois_lim_1 + ' ' + nois_lim_2)
