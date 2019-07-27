@@ -3,6 +3,4 @@
 
 import numpy as np
 
-print('\n\n\n---------------------------------------------')    # line jump
 np.show_config()
-print('---------------------------------------------')          # line jump

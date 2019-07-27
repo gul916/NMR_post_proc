@@ -24,10 +24,10 @@ def test_nmrglue(data_dir):
         uc_dim0 = ng.fileiobase.uc_from_udic(udic, dim=0)
         ppm_dim0 = uc_dim0.ppm_scale()
         
-        lev0 = 0.05 * np.amax(data.real)
-        toplev = 0.95 * np.amax(data.real)
+        lev0 = 0.1 * np.amax(data.real)
+        toplev = 0.9 * np.amax(data.real)
         nlev = 15
-        levels = np.linspace(lev0, toplev, nlev)
+        levels = np.geomspace(lev0, toplev, nlev)
         
         plt.contour(ppm_dim1, ppm_dim0, data.real, levels)
         plt.gca().invert_yaxis()
@@ -40,7 +40,6 @@ def test_nmrglue(data_dir):
     plt.show()
 
 def main():
-    print('\n\n\n---------------------------------------------')    # line jump
     try:
         if len(sys.argv) == 1:
             raise NotImplementedError("Please enter the directory of the Bruker file.")
@@ -58,7 +57,6 @@ def main():
         print("Error:", err)
     else:                                           # When no error occured
         print("NMRglue successfully tested")
-    print('---------------------------------------------')          # line jump
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly

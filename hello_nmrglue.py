@@ -11,6 +11,9 @@ def fullpath(dataset):
     fulldata="%s/%s/%s/pdata/%s" % (dat[3], dat[0], dat[1], dat[2])
     return fulldata
 
+print('\n\n\n---------------------------------------------')    # line jump
+print('hello_nmrglue.py started\n')
+
 # Get current processed data
 dataset = CURDATA()
 fulldataPATH = fullpath(dataset)
@@ -19,3 +22,6 @@ fulldataPATH = fullpath(dataset)
 FILE = 'hello_nmrglue.py'
 CPYTHON_FILE = CPYTHON_LIB + FILE
 subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE + ' ' + fulldataPATH)
+
+print('\nhello_nmrglue.py finished')
+print('---------------------------------------------')    # line jump

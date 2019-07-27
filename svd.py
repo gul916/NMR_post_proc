@@ -11,17 +11,27 @@ def fullpath(dataset):
     fulldata="%s/%s/%s" % (dat[3], dat[0], dat[1])
     return fulldata
 
-# Get current raw data
-dataset = CURDATA()
-fulldataPATH = fullpath(dataset)
+print('\n\n\n---------------------------------------------')    # line jump
+print('svd.py started')
 
-# Confirmation dialog
-#if CONFIRM("Warning", "Overwrite current raw data?") == 0:
-#    EXIT()
-#else:
-#    confirmTS = 'True'
+# Get raw data
+fulldata = fullpath(CURDATA())
+print('\nOriginal data %s' %fulldata)
+
+# Analogic conversion
+XCMD('convdta')
+fulldata_new = fullpath(CURDATA())
+if fulldata_new == fulldata:
+    ERRMSG('Analogic conversion was not performed, SVD aborted.', 'SVD')
+    EXIT()
 
 # Call to standard python
 FILE = 'denoise_nmr.py'
 CPYTHON_FILE = CPYTHON_LIB + FILE
-subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE + ' ' + fulldataPATH)
+VIEWTEXT('SVD', text='SVD in progress. Please be patient.', modal=0)
+subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE \
+    + ' ' + fulldata_new + ' ' + fulldata_new)
+
+VIEWTEXT('SVD', text='SVD finished.', modal=0)
+print('\nsvd.py finished')
+print('---------------------------------------------')    # line jump
