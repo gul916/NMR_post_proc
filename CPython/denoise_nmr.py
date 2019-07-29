@@ -33,6 +33,22 @@ max_err = 7.5   # error level for automatic thresholding, from 5 to 10 % (float)
 #%%----------------------------------------------------------------------------
 ### IMPORT AND EXPORT DATA
 ###----------------------------------------------------------------------------
+def import_data(data_dir, data_den_dir):
+    """
+    Import data
+    Usage:  dic, data, data_den_dir = import_data(data_dir, data_den_dir)
+    Input:  data_dir     data directory (string)
+    Output: dic          data parameters (dictionary)
+            data         imported data (array)
+    """
+    print('\nNoisy data {:s}'.format(data_dir))
+    dic, data = ng.bruker.read(data_dir)                # import data
+    if data.ndim >= 3:
+        raise NotImplementedError \
+            ('Data of {:d} dimensions is not yet supported'.format(data.ndim))
+    data_den_dir = export_dir(data_dir, data_den_dir)
+    return dic, data, data_den_dir
+
 def export_dir(data_dir, data_den_dir):
     """
     Check if output directory exists
@@ -56,19 +72,6 @@ def export_dir(data_dir, data_den_dir):
                 raise ValueError ('Overwritten not allowed')
     return data_den_dir
 
-def import_data(data_dir, data_den_dir):
-    """
-    Import data
-    Usage:  dic, data = import_data(data_dir, overw)
-    Input:  data_dir     data directory (string)
-    Output: dic          data parameters (dictionary)
-            data         imported data (array)
-    """
-    print('\nNoisy data {:s}\n'.format(data_dir))
-    dic, data = ng.bruker.read(data_dir)                # import data
-    data_den_dir = export_dir(data_dir, data_den_dir)
-    return dic, data, data_den_dir
-
 def export_data(dic, data_den, data_den_dir):
     """
     Export data to file
@@ -80,6 +83,20 @@ def export_data(dic, data_den, data_den_dir):
     """
     ng.bruker.write(data_den_dir, dic, data_den, overwrite=True)
     print('\nDenoised data saved to', data_den_dir)
+
+def apod(data):
+    """
+    Apply cosine apodisation
+    Usage:  data_apod = apod(data)
+    Input:  data        data to process (array)
+    Output: data_apod   data apodized (array)
+    """
+    data_apod = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)
+    if data.ndim == 2:                                  # 2D data set
+        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
+        data_apod = ng.proc_base.sp(data_apod, off=0.5, end=1.0, pow=1.0)
+        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
+    return data_apod
 
 #%%----------------------------------------------------------------------------
 ### DENOISE DATA
@@ -162,9 +179,6 @@ def denoise(data, k_thres, max_err):
         data_den = toeplitz_vector(mat_den)
     elif data.ndim == 2:                                # denoise directly
         data_den, k_thres = svd_auto.svd_auto(data, k_thres, max_err)
-    else:
-        raise NotImplementedError \
-        ('Data of {:d} dimensions is not yet supported'.format(data.ndim))
     # Revert to original precision
     data_den = precision_original(data_den, typ)
     return data_den, k_thres
@@ -172,66 +186,131 @@ def denoise(data, k_thres, max_err):
 #%%----------------------------------------------------------------------------
 ### PLOT DATA
 ###----------------------------------------------------------------------------
-def plot_data(data, data_den, k_thres):
+def spc(dic, data_fid):
+    """
+    FFT of FID with normalization, zero-filling and phasing
+    Usage: data_spc = spc(dic, data_fid)
+    Input:  dic          data parameters (dictionary)
+            data_fid     data to transform
+    Output: data_spc     transformed data
+    """
+    data_fid1 = data_fid[:]                             # avoid corruption
+    data_fid1 = ng.proc_base.zf_auto(data_fid1)         # zero-filling 2^n
+    data_fid1 = ng.proc_base.zf_double(data_fid1, 2)    # zero-filling *4
+    if data_fid1.ndim == 1:                             # 1D data set
+        data_fid1[0] = data_fid1[0] / 2                 # normalization
+        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
+    elif data_fid1.ndim == 2:                           # 2D data set
+        # First dimension
+        data_fid1[:, 0] = data_fid1[:, 0] / 2           # normalization
+        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
+        # Second dimension
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+        data_spc = ng.proc_base.zf_auto(data_spc)       # zero-filling 2^n
+        data_spc = ng.proc_base.zf_double(data_spc, 2)  # zero-filling *4
+        data_spc[:, 0] = data_spc[:, 0] / 2             # normalization
+        data_spc = ng.proc_base.fft_norm(data_spc)      # FFT with norm
+        if dic['acqu2s']['FnMODE'] == 4:                # STATES
+            pass
+        elif dic['acqu2s']['FnMODE'] == 5:              # STATES-TPPI
+            data_spc = np.fft.fftshift(data_spc, axes=-1)   # swap spectrum
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['proc2s']['PHC0'], dic['proc2s']['PHC1'], True)   # phasing
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+    return data_spc
+        
+def plot_data(dic, data_apod, data_den, k_thres):
     """
     Plot noisy and denoised data, if needed
-    Usage:  plot_data(data, data_den, plot_value)
-    Input:  data        noisy data (array)
-            data_den    denoised data (array)
-            k_thres     number of values used for thresholding
+    Usage:  plot_data(dic, data_apod, data_den, plot_value)
+    Input:  dic          data parameters (dictionary)
+            data_apod    apodised noisy data (array)
+            data_den     apodised denoised data (array)
+            k_thres      number of values used for thresholding
     Output: none
     """
     fig = plt.figure()
-    if data.ndim == 1:                              # 1D data set
-        data_spc = np.fft.fftshift(np.fft.fft(data))
-        data_den_spc = np.fft.fftshift(np.fft.fft(data_den))
-        min_x, max_x = [0, data.size-1]
-        min_y_fid, max_y_fid = [np.min(data.real)*1.1, \
-                                np.max(data.real)*1.1]
+    data_spc = spc(dic, data_apod)                      # FFT and phasing
+    data_den_spc = spc(dic, data_den)
+    if data_apod.ndim == 1:                             # 1D data set
+        # FID scale
+        udic = ng.bruker.guess_udic(dic, data_apod)     # universal dictionary
+        x_scale_fid = ng.fileiobase.uc_from_udic(udic).ms_scale()
+        min_y_fid, max_y_fid = [np.min(data_apod.real)*1.1, \
+                                np.max(data_apod.real)*1.1]
+        # SPC scale
+        udic = ng.bruker.guess_udic(dic, data_spc)      # universal dictionary
+        x_scale_spc = ng.fileiobase.uc_from_udic(udic).ppm_scale()
         min_y_spc, max_y_spc = [np.min(data_spc.real)*1.1, \
                                 np.max(data_spc.real)*1.1]
+        # Figure
         ax1 = fig.add_subplot(221)
         ax1.set_title('Noisy FID')
-        ax1.plot(data.real)
-        ax1.axis([min_x, max_x, min_y_fid, max_y_fid])
+        ax1.set_xlabel('ms')
+        ax1.plot(x_scale_fid, data_apod.real)
+        ax1.axis([x_scale_fid[0], x_scale_fid[-1], min_y_fid, max_y_fid])
         ax2 = fig.add_subplot(222)
         ax2.set_title('Denoised FID, k = {:d}'.format(k_thres))
-        ax2.plot(data_den.real)
-        ax2.axis([min_x, max_x, min_y_fid, max_y_fid])
+        ax2.set_xlabel('ms')
+        ax2.plot(x_scale_fid, data_den.real)
+        ax2.axis([x_scale_fid[0], x_scale_fid[-1], min_y_fid, max_y_fid])
         ax3 = fig.add_subplot(223)
         ax3.set_title('Noisy SPC')
-        ax3.plot(data_spc.real)
-        ax3.axis([max_x, min_x, min_y_spc, max_y_spc])
+        ax3.set_xlabel('ppm')
+        ax3.plot(x_scale_spc, data_spc.real)
+        ax3.axis([x_scale_spc[0], x_scale_spc[-1], min_y_spc, max_y_spc])
         ax4 = fig.add_subplot(224)
         ax4.set_title('Denoised SPC, k = {:d}'.format(k_thres))
-        ax4.plot(data_den_spc.real)
-        ax4.axis([max_x, min_x, min_y_spc, max_y_spc])
-    elif data.ndim == 2:                            # 2D data set
-        data_spc = np.fft.fftshift(np.fft.fft \
-            (np.fft.fft(data, axis=1), axis=0))
-        data_den_spc = np.fft.fftshift(np.fft.fft \
-            (np.fft.fft(data_den, axis=1), axis=0))
-        lev0_fid = 0.1 * np.amax(data.real)
-        toplev_fid = 0.9 * np.amax(data.real)
-        lev0_spc = 0.1 * np.amax(data_spc.real)
-        toplev_spc = 0.9 * np.amax(data_spc.real)
+        ax4.set_xlabel('ppm')
+        ax4.plot(x_scale_spc, data_den_spc.real)
+        ax4.axis([x_scale_spc[0], x_scale_spc[-1], min_y_spc, max_y_spc])
+    elif data_apod.ndim == 2:                           # 2D data set
+        data_apod_real = data_apod[::2,:]   # remove interleaved imaginary part
+        data_den_real = data_den[::2,:]
+        data_spc_real = data_spc[::2,:]
+        data_den_spc_real = data_den_spc[::2,:]
         nlev = 15
+        # FID scale
+        udic = ng.bruker.guess_udic(dic, data_apod_real) # universal dictionary
+        x_scale_fid = ng.fileiobase.uc_from_udic(udic, dim=1).ms_scale()
+        y_scale_fid = ng.fileiobase.uc_from_udic(udic, dim=0).ms_scale()
+        lev0_fid = 0.1 * np.amax(data_apod_real.real)
+        toplev_fid = 0.9 * np.amax(data_apod_real.real)
         levels_fid = np.geomspace(lev0_fid, toplev_fid, nlev)
+        # SPC scale
+        udic = ng.bruker.guess_udic(dic, data_spc_real)      # universal dictionary
+        x_scale_spc = ng.fileiobase.uc_from_udic(udic, dim=1).ppm_scale()[::-1]
+        y_scale_spc = ng.fileiobase.uc_from_udic(udic, dim=0).ppm_scale()[::-1]
+        lev0_spc = 0.1 * np.amax(data_spc_real.real)
+        toplev_spc = 0.9 * np.amax(data_spc_real.real)
         levels_spc = np.geomspace(lev0_spc, toplev_spc, nlev)
+        # Figure
         ax1 = fig.add_subplot(221)
         ax1.set_title('Noisy FID')
-        ax1.contour(data.real, levels_fid)
+        ax1.set_xlabel('ms')
+        ax1.set_ylabel('ms')
+        ax1.contour(x_scale_fid, y_scale_fid, data_apod_real.real, levels_fid)
         ax2 = fig.add_subplot(222)
         ax2.set_title('Denoised FID, k = {:d}'.format(k_thres))
-        ax2.contour(data_den.real, levels_fid)
+        ax2.set_xlabel('ms')
+        ax2.set_ylabel('ms')
+        ax2.contour(x_scale_fid, y_scale_fid, data_den_real.real, levels_fid)
         ax3 = fig.add_subplot(223)
         ax3.set_title('Noisy SPC')
-        ax3.contour(data_spc.real, levels_spc)
+        ax3.set_xlabel('ppm')
+        ax3.set_ylabel('ppm')
+        ax3.contour(x_scale_spc, y_scale_spc, data_spc_real.real, levels_spc)
         ax3.invert_xaxis()
         ax3.invert_yaxis()
         ax4 = fig.add_subplot(224)
         ax4.set_title('Denoised SPC, k = {:d}'.format(k_thres))
-        ax4.contour(data_den_spc.real, levels_spc)
+        ax4.set_xlabel('ppm')
+        ax4.set_ylabel('ppm')
+        ax4.contour(x_scale_spc, y_scale_spc, data_den_spc_real.real, levels_spc)
         ax4.invert_xaxis()
         ax4.invert_yaxis()
     fig.tight_layout()
@@ -256,16 +335,17 @@ def denoise_io(data_dir, data_den_dir, k_thres, max_err):
     Output: none
     """
     try:
-        # Import data with single precision to decrease computation time
+        # Import data and apply apodisation
         dic, data, data_den_dir = import_data(data_dir, data_den_dir)
+        data_apod = apod(data)
         
         # Denoise data
-        data_den, k_thres = denoise(data, k_thres, max_err)
+        data_den, k_thres = denoise(data_apod, k_thres, max_err)
         
         # Plot original and denoised data
-        plot_data(data, data_den, k_thres)
+        plot_data(dic, data_apod, data_den, k_thres)
         
-        # Export data with original precision
+        # Export data
         export_data(dic, data_den, data_den_dir)
         
     except KeyError as err:                             # writing data
