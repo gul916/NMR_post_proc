@@ -29,6 +29,7 @@ dim = dimension(fulldata)
 print('\nOriginal data %s' %fulldata_proc)
 
 # Analogic conversion
+# Induces negative components for each line
 XCMD('convdta')
 fulldata_new, fulldata_new_proc = fullpath(CURDATA())
 if fulldata_new == fulldata:
@@ -36,17 +37,27 @@ if fulldata_new == fulldata:
     EXIT()
 
 # For phasing under python
+PUTPAR('1 WDW', 'SINE')
+PUTPAR('1 SSB', '2')
 if dim == 1:
     EFP()
 else:
+    PUTPAR('2 WDW', 'SINE')
+    PUTPAR('2 SSB', '2')
     XFB()
+
+# SVD options
+options = INPUT_DIALOG('SVD options', '', ['k_thres = ', 'max_err'], \
+    ['0', '7.5'], ['0: automatic thresholding\n>0: manual thresholding', \
+    'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
 
 # Call to standard python
 FILE = 'denoise_nmr.py'
 CPYTHON_FILE = CPYTHON_LIB + FILE
+ARGUMENTS = fulldata_new_proc +' '+ fulldata_new \
+    +' '+ options[0] +' '+ options[1]
 SHOW_STATUS('SVD in progress, please be patient.')
-subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE \
-    + ' ' + fulldata_new_proc + ' ' + fulldata_new)
+subprocess.call(CPYTHON_BIN +' '+ CPYTHON_FILE +' '+ ARGUMENTS)
 
 # Read processed data
 PUTPAR('1 WDW', 'no')

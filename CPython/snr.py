@@ -114,7 +114,7 @@ def signal_noise(ppm_scale, data, signal_lim, noise_lim):
     snnr = signal_rms / noise_rms
     snr = snnr**2 - 1
     psnr_max = signal_max / noise_max
-    psnr_rms = signal_max / (noise_rms *2)
+    psnr_rms = signal_max / noise_rms
     Lc = noise_mean + noise_rms * 1.64                  # critical limit
     Ld = noise_mean + noise_rms * 3.29                  # detection limit
     Lq = noise_mean + noise_rms * 10                    # quantification limit

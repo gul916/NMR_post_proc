@@ -84,6 +84,9 @@ def export_data(dic, data_den, data_den_dir):
     ng.bruker.write(data_den_dir, dic, data_den, overwrite=True)
     print('\nDenoised data saved to', data_den_dir)
 
+#%%----------------------------------------------------------------------------
+### PROCESSING
+###----------------------------------------------------------------------------
 def apod(data):
     """
     Apply cosine apodisation
@@ -97,6 +100,43 @@ def apod(data):
         data_apod = ng.proc_base.sp(data_apod, off=0.5, end=1.0, pow=1.0)
         data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
     return data_apod
+
+def spc(dic, data_fid):
+    """
+    FFT of FID with normalization, zero-filling and phasing
+    Usage: data_spc = spc(dic, data_fid)
+    Input:  dic          data parameters (dictionary)
+            data_fid     data to transform
+    Output: data_spc     transformed data
+    """
+    data_fid1 = data_fid[:]                             # avoid corruption
+    data_fid1 = ng.proc_base.zf_auto(data_fid1)         # zero-filling 2^n
+    data_fid1 = ng.proc_base.zf_double(data_fid1, 2)    # zero-filling *4
+    if data_fid1.ndim == 1:                             # 1D data set
+        data_fid1[0] = data_fid1[0] / 2                 # normalization
+        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
+    elif data_fid1.ndim == 2:                           # 2D data set
+        # First dimension
+        data_fid1[:, 0] = data_fid1[:, 0] / 2           # normalization
+        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
+        # Second dimension
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+        data_spc = ng.proc_base.zf_auto(data_spc)       # zero-filling 2^n
+        data_spc = ng.proc_base.zf_double(data_spc, 2)  # zero-filling *4
+        data_spc[:, 0] = data_spc[:, 0] / 2             # normalization
+        data_spc = ng.proc_base.fft_norm(data_spc)      # FFT with norm
+        if dic['acqu2s']['FnMODE'] == 4:                # STATES
+            pass
+        elif dic['acqu2s']['FnMODE'] == 5:              # STATES-TPPI
+            data_spc = np.fft.fftshift(data_spc, axes=-1)       # swap spectrum
+        data_spc = ng.proc_base.ps(data_spc, \
+            dic['proc2s']['PHC0'], dic['proc2s']['PHC1'], True) # phasing
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+    return data_spc
 
 #%%----------------------------------------------------------------------------
 ### DENOISE DATA
@@ -186,46 +226,9 @@ def denoise(data, k_thres, max_err):
 #%%----------------------------------------------------------------------------
 ### PLOT DATA
 ###----------------------------------------------------------------------------
-def spc(dic, data_fid):
-    """
-    FFT of FID with normalization, zero-filling and phasing
-    Usage: data_spc = spc(dic, data_fid)
-    Input:  dic          data parameters (dictionary)
-            data_fid     data to transform
-    Output: data_spc     transformed data
-    """
-    data_fid1 = data_fid[:]                             # avoid corruption
-    data_fid1 = ng.proc_base.zf_auto(data_fid1)         # zero-filling 2^n
-    data_fid1 = ng.proc_base.zf_double(data_fid1, 2)    # zero-filling *4
-    if data_fid1.ndim == 1:                             # 1D data set
-        data_fid1[0] = data_fid1[0] / 2                 # normalization
-        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
-    elif data_fid1.ndim == 2:                           # 2D data set
-        # First dimension
-        data_fid1[:, 0] = data_fid1[:, 0] / 2           # normalization
-        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
-        # Second dimension
-        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
-        data_spc = ng.proc_base.zf_auto(data_spc)       # zero-filling 2^n
-        data_spc = ng.proc_base.zf_double(data_spc, 2)  # zero-filling *4
-        data_spc[:, 0] = data_spc[:, 0] / 2             # normalization
-        data_spc = ng.proc_base.fft_norm(data_spc)      # FFT with norm
-        if dic['acqu2s']['FnMODE'] == 4:                # STATES
-            pass
-        elif dic['acqu2s']['FnMODE'] == 5:              # STATES-TPPI
-            data_spc = np.fft.fftshift(data_spc, axes=-1)   # swap spectrum
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['proc2s']['PHC0'], dic['proc2s']['PHC1'], True)   # phasing
-        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
-    return data_spc
-        
 def plot_data(dic, data_apod, data_den, k_thres):
     """
-    Plot noisy and denoised data, if needed
+    Plot noisy and denoised data
     Usage:  plot_data(dic, data_apod, data_den, plot_value)
     Input:  dic          data parameters (dictionary)
             data_apod    apodised noisy data (array)
@@ -274,43 +277,50 @@ def plot_data(dic, data_apod, data_den, k_thres):
         data_spc_real = data_spc[::2,:]
         data_den_spc_real = data_den_spc[::2,:]
         nlev = 15
+        colormap = 'viridis'                            # color map
         # FID scale
-        udic = ng.bruker.guess_udic(dic, data_apod_real) # universal dictionary
+        udic = ng.bruker.guess_udic(dic, data_apod_real)# universal dictionary
         x_scale_fid = ng.fileiobase.uc_from_udic(udic, dim=1).ms_scale()
         y_scale_fid = ng.fileiobase.uc_from_udic(udic, dim=0).ms_scale()
         lev0_fid = 0.1 * np.amax(data_apod_real.real)
         toplev_fid = 0.9 * np.amax(data_apod_real.real)
         levels_fid = np.geomspace(lev0_fid, toplev_fid, nlev)
+        levels_fid = np.concatenate((-levels_fid[-1::-1], levels_fid))
         # SPC scale
-        udic = ng.bruker.guess_udic(dic, data_spc_real)      # universal dictionary
+        udic = ng.bruker.guess_udic(dic, data_spc_real) # universal dictionary
         x_scale_spc = ng.fileiobase.uc_from_udic(udic, dim=1).ppm_scale()[::-1]
         y_scale_spc = ng.fileiobase.uc_from_udic(udic, dim=0).ppm_scale()[::-1]
         lev0_spc = 0.1 * np.amax(data_spc_real.real)
         toplev_spc = 0.9 * np.amax(data_spc_real.real)
         levels_spc = np.geomspace(lev0_spc, toplev_spc, nlev)
+        levels_spc = np.concatenate((-levels_spc[-1::-1], levels_spc))
         # Figure
         ax1 = fig.add_subplot(221)
         ax1.set_title('Noisy FID')
         ax1.set_xlabel('ms')
         ax1.set_ylabel('ms')
-        ax1.contour(x_scale_fid, y_scale_fid, data_apod_real.real, levels_fid)
+        ax1.contour(x_scale_fid, y_scale_fid, data_apod_real.real, \
+            levels_fid, cmap=colormap)
         ax2 = fig.add_subplot(222)
         ax2.set_title('Denoised FID, k = {:d}'.format(k_thres))
         ax2.set_xlabel('ms')
         ax2.set_ylabel('ms')
-        ax2.contour(x_scale_fid, y_scale_fid, data_den_real.real, levels_fid)
+        ax2.contour(x_scale_fid, y_scale_fid, data_den_real.real, \
+            levels_fid, cmap=colormap)
         ax3 = fig.add_subplot(223)
         ax3.set_title('Noisy SPC')
         ax3.set_xlabel('ppm')
         ax3.set_ylabel('ppm')
-        ax3.contour(x_scale_spc, y_scale_spc, data_spc_real.real, levels_spc)
+        ax3.contour(x_scale_spc, y_scale_spc, data_spc_real.real, \
+            levels_spc, cmap=colormap)
         ax3.invert_xaxis()
         ax3.invert_yaxis()
         ax4 = fig.add_subplot(224)
         ax4.set_title('Denoised SPC, k = {:d}'.format(k_thres))
         ax4.set_xlabel('ppm')
         ax4.set_ylabel('ppm')
-        ax4.contour(x_scale_spc, y_scale_spc, data_den_spc_real.real, levels_spc)
+        ax4.contour(x_scale_spc, y_scale_spc, data_den_spc_real.real, \
+            levels_spc, cmap=colormap)
         ax4.invert_xaxis()
         ax4.invert_yaxis()
     fig.tight_layout()
