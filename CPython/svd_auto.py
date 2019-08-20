@@ -37,7 +37,7 @@ def pre_svd(X):
     if X.ndim != 2:                                     # wrong data dimensions
         raise NotImplementedError('Data should be a 2D matrix.')
     m, n = X.shape
-    if(m > n):                                  # transpose if needed for GPU
+    if(m < n):                                  # transpose if needed for GPU
         X = X.transpose()
         transp = True
     else:
@@ -93,6 +93,7 @@ def post_svd(X, Xk, transp, disp_err):
     Output: Xk          transposed recovered matrix, if needed (array)
     """
     if transp == True:
+        X = X.transpose()
         Xk = Xk.transpose()
     if isinstance(Xk, np.ndarray) and (disp_err==True): # Only if array exists
         print('Maximum relative error:\t\t{0:8.2e}'\
@@ -406,11 +407,31 @@ if __name__ == '__main__':
     size_list = [1024, 2048, 4096, 8192]
     # Select data types
     # CULA free only support float32 and complex64
-    type_list = ['float32', 'complex64', 'float64', 'complex128']
+    type_list = ['float32', 'float64', 'complex64', 'complex128']
+    benchmark = [['Points', 'Type', 'scipy (s)', 'skcuda (s)']]
+
+    # Benchmarking
     for n in size_list:                                 # number of columns
         m = n + 1                                       # number of rows
         print('\n--------------------------------------------------')
         for typ in type_list:                           # data type
             X = np.arange(m*n).reshape(m, n).astype(typ)
-            svd_auto(X, k_thres=n, lib='scipy', disp_err=True)# using CPU
-            svd_auto(X, k_thres=n, lib='skcuda',disp_err=True)# using GPU
+            try:    # using CPU
+                t_cpu_0 = time.time()
+                Xk, k_thres = svd_auto(X, k_thres=n, lib='scipy', disp_err=True)
+                t_cpu = time.time() - t_cpu_0
+            except TypeError:                       # avoid insignificant value
+                t_cpu = float('nan')
+            try:    # using GPU
+                t_gpu_0 = time.time()
+                Xk, k_thres = svd_auto(X, k_thres=n, lib='skcuda', disp_err=True)
+                t_gpu = time.time() - t_gpu_0
+            except TypeError:                       # avoid insignificant value
+                t_gpu = float('nan')
+            benchmark.append([str(m)+' x '+str(n), typ, t_cpu, t_gpu])
+    
+    # Final result
+    print('\n--------------------------------------------------')
+    print('{:^15s}{:^12s}{:^8s}{:^8s}'.format(*benchmark[0]))
+    for row in benchmark[1:]:
+        print('{:^15s}{:<12s}{:>8.2f}{:>8.2f}'.format(*row))
