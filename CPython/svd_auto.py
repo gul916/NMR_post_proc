@@ -8,12 +8,19 @@ with automatic low-rank approximation on processor (SciPy)
 and on NVIDIA graphic card (scikit-cuda).
 
 G. Laurent, P.-A. Gilles, W. Woelffel, V. Barret-Vivin, E. Gouillart, et C. Bonhomme,
-« Denoising applied to spectroscopies – Part II: Decreasing computation time »,
+« Denoising applied to spectroscopies – Part II: Decreasing computation time »,
 Appl. Spectrosc. Rev., 2019, doi: 10.1080/05704928.2018.1559851
 """
 
 import numpy as np
 import time
+# CPU library
+import scipy.linalg as sp_linalg
+# GPU libraries
+import pycuda.autoinit                          # needed
+import pycuda.gpuarray as gpuarray
+import skcuda.linalg as cu_linalg
+cu_linalg.init()                                # needed
 
 # Default value
 cpu_gpu_lim = 4096  # Number of columns to switch denoising hardware.
@@ -53,7 +60,6 @@ def lib_svd(X, lib):
     Output: lib         selected library (string)
             typ         data type (string)
     """
-    t_0 = time.time()
     m, n = X.shape
     typ = X.dtype                                       # check data type
     if lib == 'auto':
@@ -64,22 +70,11 @@ def lib_svd(X, lib):
     if lib == 'scipy':                                  # use CPU
         print('\n\t{:5} x {:5} points - Scipy - {:8s}' \
             .format(m, n, str(np.dtype(typ))))
-        # CPU libraries
-        global sp_linalg
-        import scipy.linalg as sp_linalg
     elif lib == 'skcuda':                               # use GPU
         print('\n\t{:5} x {:5} points - skCuda - {:8s}' \
             .format(m, n, str(np.dtype(typ))))
-        # GPU libraries
-        global gpuarray, cu_linalg
-        import pycuda.autoinit                          # needed
-        import pycuda.gpuarray as gpuarray
-        import skcuda.linalg as cu_linalg
-        cu_linalg.init()                                # needed
     else:                                               # no library
         raise ImportError('Unknown SVD library')
-    t_1 = time.time()
-    print('Library importation time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return lib, typ
 
 def post_svd(X, Xk, transp, disp_err):
@@ -97,7 +92,11 @@ def post_svd(X, Xk, transp, disp_err):
         Xk = Xk.transpose()
     if isinstance(Xk, np.ndarray) and (disp_err==True): # Only if array exists
         print('Maximum relative error:\t\t{0:8.2e}'\
-            .format(np.max(np.abs(X-Xk)) / np.max(np.abs(X))))
+            .format(np.max(np.abs(Xk-X)) / np.max(np.abs(X))))
+        print('Root mean squared error:\t{0:8.2e}'\
+            .format(np.sqrt(((Xk - X) ** 2).mean()).real))
+        print('l2-norm:\t\t\t{0:8.2e}'\
+            .format(np.linalg.norm(Xk-X)))
     return Xk
 
 #%%----------------------------------------------------------------------------
@@ -116,7 +115,7 @@ def svd_scipy(X, typ):
     print('\tSVD in progress, please be patient.')
     t_0 = time.time()
     X = X.astype(typ)
-    U, S, Vt = sp_linalg.svd(X)
+    U, S, Vt = sp_linalg.svd(X, full_matrices=False)
     t_1 = time.time()
     print('Decomposition time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return U, S, Vt
@@ -416,17 +415,17 @@ if __name__ == '__main__':
         print('\n--------------------------------------------------')
         for typ in type_list:                           # data type
             X = np.arange(m*n).reshape(m, n).astype(typ)
-            try:    # using CPU
+            try:                        # using CPU
                 t_cpu_0 = time.time()
                 Xk, k_thres = svd_auto(X, k_thres=n, lib='scipy', disp_err=True)
                 t_cpu = time.time() - t_cpu_0
-            except TypeError:                       # avoid insignificant value
+            except TypeError:           # avoid insignificant value
                 t_cpu = float('nan')
-            try:    # using GPU
+            try:                        # using GPU
                 t_gpu_0 = time.time()
                 Xk, k_thres = svd_auto(X, k_thres=n, lib='skcuda', disp_err=True)
                 t_gpu = time.time() - t_gpu_0
-            except TypeError:                       # avoid insignificant value
+            except TypeError:           # avoid insignificant value
                 t_gpu = float('nan')
             benchmark.append([str(m)+' x '+str(n), typ, t_cpu, t_gpu])
     
