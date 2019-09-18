@@ -6,8 +6,9 @@
 """
 
 # Python libraries
+import nmrglue as ng
 import numpy as np
-
+import warnings
 
 class Signal:
     """
@@ -147,10 +148,8 @@ class Signal:
     nbPtHalfEcho = property(_get_nbPtHalfEcho)
     def set_nbPtHalfEcho(self):
         self._nbPtHalfEcho = int(self._halfEcho / self._dw2)
-        if (Decimal(self._halfEcho) % Decimal(self._dw2)) != Decimal('0.00'):
-            # modulo doesn't work with decimal numbers (precision)
-            # print("Warning : HalfEcho is supposed to be a multiple of 2*dw")
-            pass
+        if round((self._halfEcho / self._dw2) % 1, 2) not in (0.0, 1.0):
+            warnings.warn("HalfEcho is supposed to be a multiple of 2*dw")
 
 
     def _get_nbPtSignal(self):
@@ -172,8 +171,8 @@ class Signal:
     nbPtDeadTime = property(_get_nbPtDeadTime)
     def set_nbPtDeadTime(self):
         self._nbPtDeadTime = int(self._de / self._dw2)
-        if (Decimal(self._de) % Decimal(self._dw2)) != Decimal('0.00'):
-            print("Warning : de is supposed to be a multiple of 2*dw")
+        if round((self._de / self._dw2) % 1, 2) not in (0.0, 1.0):
+            warnings.warn("de is supposed to be a multiple of 2*dw")
 
 
     def setValues_topspin(self,newnbPt,newdw,newde):
@@ -215,4 +214,78 @@ class Signal:
     data = property(_get_data)
     def setData(self,newdata):
         self._data = newdata
-    
+
+
+#%%----------------------------------------------------------------------------
+### PROCESSING
+###----------------------------------------------------------------------------
+def apod_cos(data_fid):
+    """
+    Apply cosine apodisation
+    Usage:  data_apod = apod(data)
+    Input:  data_fid    data to process (array)
+    Output: data_apod   data apodized (array)
+    """
+    # 1D data set or direct dimension of nD dataset
+    data_apod = ng.proc_base.sp(data_fid, off=0.5, end=1.0, pow=1.0)
+    # 2D data set
+    if data_fid.ndim == 2:                              # 2D data set
+        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
+        data_apod = ng.proc_base.sp(data_apod, off=0.5, end=1.0, pow=1.0)
+        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
+    # higher dimensions data set
+    elif data_fid.ndim > 2:
+        raise NotImplementedError('Data of dimensions higher than 2 are not supported')
+    return data_apod
+
+
+#def spc(dic, data_fid):
+def spc(data_fid):
+    """
+    FFT of FID with normalization and zero-filling
+    Usage:  data_spc = spc(data_fid)
+    Input:  data_fid     data to transform
+    Output: data_spc     transformed data
+    """
+    data_spc = data_fid[:]                              # avoid data corruption
+    # 1D data set or direct dimension of nD dataset
+    data_spc = ng.proc_base.zf_auto(data_spc)           # zero-filling 2^n
+    data_spc = ng.proc_base.zf_double(data_spc, 2)      # zero-filling *4
+    data_spc[0] /=  2                                   # normalization
+    data_spc = ng.proc_base.fft_norm(data_spc)          # FFT with norm
+    # 2D data set
+    if data_spc.ndim == 2:
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+        data_spc = ng.proc_base.zf_auto(data_spc)       # zero-filling 2^n
+        data_spc = ng.proc_base.zf_double(data_spc, 2)  # zero-filling *4
+        data_spc[:, 0] /= 2                             # normalization
+        data_spc = ng.proc_base.fft_norm(data_spc)      # FFT with norm
+        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
+    # higher dimensions data set
+    elif data_spc.ndim > 2:
+        raise NotImplementedError('Data of dimensions higher than 2 are not supported')
+    return data_spc
+
+
+def phase(data_spc, dic):
+    """
+    Automatic spectrum phasing
+    Usage:  data_spc = spc(dic, data_fid)
+    Input:  data_spc     spectrum
+            dic          data parameters (dictionary)
+    Output: data_spc1    phased data
+    """
+    data_spc1 = data_spc[:]                             # avoid data corruption
+    # 1D data set or direct dimension of nD dataset
+    data_spc1 = ng.proc_base.ps(data_spc1, \
+        dic['procs']['PHC0'], dic['procs']['PHC1'], True)       # phasing
+    # 2D data set
+    if data_spc1.ndim == 2:                             # 2D data set
+        data_spc1 = ng.proc_base.tp_hyper(data_spc1)    # hypercomplex transpose
+        data_spc1 = ng.proc_base.ps(data_spc1, \
+            dic['proc2s']['PHC0'], dic['proc2s']['PHC1'], True) # phasing
+        data_spc1 = ng.proc_base.tp_hyper(data_spc1)    # hypercomplex transpose
+    # higher dimensions data set
+    elif data_spc1.ndim > 2:
+        raise NotImplementedError('Data of dimensions higher than 2 are not supported')
+    return data_spc1
