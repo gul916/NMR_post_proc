@@ -6,8 +6,8 @@ Created on Mon Sep 23 15:46:07 2019
 @author: guillaume
 """
 
-import nmrglue as ng
 import matplotlib.pyplot as plt
+import nmrglue as ng
 
 data_dir = '/home/guillaume/Data_NMR/300WB_3.2/data/Guillaume/nmr/20140522-TEOS-MTEOS-50-50-4MQ-500/2013/pdata/1'
 dic, data = ng.bruker.read(data_dir)

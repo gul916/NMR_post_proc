@@ -7,54 +7,92 @@
 
 # Python libraries
 import matplotlib.pyplot as plt
+import nmrglue as ng
 import numpy as np
+import sys
 # User defined libraries
+import CPMG_gen
 import postproc
 
-def plot_function(rawFID, rawSPC):
-    nbPtFreq = rawSPC.size
-    freq = np.linspace(-1/(2*rawFID.dw2), 1/(2*rawFID.dw2), nbPtFreq)
+def data_import():
+    if len(sys.argv) == 1:
+        rawFID = CPMG_gen.main()
+    else:
+        raise NotImplementedError('Additional arguments are not yet supported')
+    return rawFID
+
+def echo_apod(rawFID):
+    desc = rawFID.firstDec
+    apodFID = rawFID.data.copy()
+    for i in range(rawFID.nbHalfEcho):
+        halfEcho = slice(i*rawFID.nbPtHalfEcho, (i+1)*rawFID.nbPtHalfEcho)
+        apodFID[halfEcho] = (ng.proc_base.sp(
+            apodFID[halfEcho], off=0, end=0.5, pow=1.0, rev=desc))
+        desc = not(desc)
+    end = slice(rawFID.nbHalfEcho * rawFID.nbPtHalfEcho, rawFID.td2 + 1)
+    apodFID[end] = 0 + 1j*0
+    apodFID = postproc.Signal(
+        apodFID, rawFID.dw, rawFID.de,
+        rawFID.firstDec, rawFID.nbEcho, rawFID.fullEcho)
+    return apodFID
+
+def plot_function(rawFID, apodFID):
+    # Zero-filling, Fourier transform and phasing
+    rawSPC = postproc.spc(rawFID)
+    rawSPC.data = ng.proc_autophase.autops(rawSPC.data, 'acme')
+    apodSPC = postproc.spc(apodFID)
+    apodSPC.data = ng.proc_autophase.autops(apodSPC.data, 'acme')
+    vert_scale_FID = abs(max(rawFID.data.real)) * 1.1
+    vert_scale_SPC = abs(max(rawSPC.data.real)) * 1.1
     
-    plt.ion()                       # interactive mode on
+    # Plotting
+    plt.ion()                               # interactive mode on
     fig1 = plt.figure()
-    ax1 = fig1.add_subplot(111)
-    ax1.plot(freq, rawSPC.real)
-    ax1.invert_xaxis()
+    fig1.suptitle('CPMG NMR signal processing - FID', fontsize=16)
     
-    # Avoid superpositions on figure
-    fig1.tight_layout(rect=(0,0,1,0.95))
-    fig1.show()                     # Display figure
+    ax1_1 = fig1.add_subplot(411)
+    ax1_1.set_title('Raw FID')
+    ax1_1.plot(rawFID.ms_scale, rawFID.data.real)
+    ax1_1.set_xlim(
+        [-rawFID.halfEcho * 1e3, (rawFID.acquiT+rawFID.halfEcho)*1e3])
+    ax1_1.set_ylim([-vert_scale_FID, vert_scale_FID])
+    
+    ax1_2 = fig1.add_subplot(412)
+    ax1_2.set_title('Echo apodised FID')
+    ax1_2.plot(apodFID.ms_scale, apodFID.data.real)
+    ax1_2.set_xlim(
+        [-apodFID.halfEcho * 1e3, (apodFID.acquiT+apodFID.halfEcho)*1e3])
+    ax1_2.set_ylim([-vert_scale_FID, vert_scale_FID])
+    
+    fig2 = plt.figure()
+    fig2.suptitle('CPMG NMR signal processing - SPC', fontsize=16)
+    
+    ax2_1 = fig2.add_subplot(411)
+    ax2_1.set_title('Raw SPC')
+    ax2_1.plot(rawSPC.ppm_scale, rawSPC.data.real)
+    ax2_1.invert_xaxis()
+    ax2_1.set_ylim([-vert_scale_SPC*0.1, vert_scale_SPC])
+    
+    ax2_2 = fig2.add_subplot(412)
+    ax2_2.set_title('Echo apodised SPC')
+    ax2_2.plot(apodSPC.ppm_scale, apodSPC.data.real)
+    ax2_2.invert_xaxis()
+    ax2_2.set_ylim([-vert_scale_SPC*0.1, vert_scale_SPC])
+
+    # Display figures
+    fig1.tight_layout(rect=(0,0,1,0.95))    # Avoid superpositions on figures
+    fig2.tight_layout(rect=(0,0,1,0.95))
+    fig1.show()
+    fig2.show()
+
+def main():
+    rawFID = data_import()
+    apodFID = echo_apod(rawFID)
+    plot_function(rawFID, apodFID)
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
-
 if __name__ == "__main__":
-    import sys
-    
-#    print('len(sys.argv)', len(sys.argv))
-
-    if len(sys.argv) == 1:
-        A_data = np.genfromtxt('./CPMG_FID.csv',delimiter='\t', skip_header=1)
-        A_data = A_data[:,0] + 1j*A_data[:,1]
-    
-        A_firstDec = True
-        A_fullEcho = 10e-3
-        A_nbEcho = 20               # 38 for less than 8k points, 76 for more
-        
-        A_td = 32768                # nb of real points + nb of imag points
-        A_dw = 24e-6                # dwell time between two points
-        A_de = 96e-6                # dead time before signal acquisition
-        
-        # Saving data to Signal class
-        rawFID = postproc.Signal()
-        rawFID.setValues_topspin(A_td,A_dw,A_de)
-        rawFID.setValues_CPMG(A_firstDec,A_fullEcho,A_nbEcho)
-        rawFID.setData(A_data)
-    else:
-        print("Additional arguments are not yet supported")
-    
-    rawSPC = postproc.spc(rawFID.data)
-    plot_function(rawFID, rawSPC)
-
-    input('\nPress enter key to exit') # wait before closing terminal
+    main()
+    input('\nPress enter key to exit')      # wait before closing figures

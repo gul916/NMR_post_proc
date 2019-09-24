@@ -42,8 +42,8 @@ class Signal:
         if not isinstance(val, np.ndarray):
             raise ValueError('data must be an array')
         self.__data = val
-        self.__td2 = self.data.size
-        self.__td = self.__td2 * 2
+        self.td2 = self.data.size
+        self.__td = self.td2 * 2
     
     @property
     def dw(self):
@@ -54,10 +54,10 @@ class Signal:
             raise ValueError('dw must be > 0')
         self.__dw = val
         self.__dw2 = 2 * self.__dw
-        self.acquiT = (self.__td2 - 1) * self.__dw2
-        self.ms_scale = np.linspace(0, self.acquiT, self.__td2) * 1e3
+        self.acquiT = (self.td2 - 1) * self.__dw2
+        self.ms_scale = np.linspace(0, self.acquiT, self.td2) * 1e3
         self.ppm_scale = np.linspace(
-                -1/(2*self.__dw2), 1/(2*self.__dw2), self.__td2)
+                -1/(2*self.__dw2), 1/(2*self.__dw2), self.td2)
     
     @property
     def de(self):
@@ -91,9 +91,9 @@ class Signal:
         if val < 0:
             raise ValueError('nbEcho must be > 0')
         self.__nbEcho = val
-        self.__nbHalfEcho = self.__nbEcho * 2
+        self.nbHalfEcho = self.__nbEcho * 2
         if self.__firstDec == True:
-            self.__nbHalfEcho += 1
+            self.nbHalfEcho += 1
 
     @property
     def fullEcho(self):
@@ -106,12 +106,12 @@ class Signal:
         self.halfEcho = self.__fullEcho / 2
         if round((self.halfEcho / self.__dw2) % 1, 2) not in (0.0, 1.0):
             warnings.warn('HalfEcho is supposed to be a multiple of 2*dw')
-        self.__nbPtHalfEcho = int(self.halfEcho / self.__dw2)
-        self.__nbPtSignal = self.__nbPtHalfEcho * self.__nbHalfEcho
+        self.nbPtHalfEcho = int(self.halfEcho / self.__dw2)
+        self.__nbPtSignal = self.nbPtHalfEcho * self.nbHalfEcho
         self.__dureeSignal = (self.__nbPtSignal -1) * self.__dw2
         if (self.__dureeSignal > self.acquiT):
             raise ValueError('Too many echoes during acquisition time')
-        self.__missingPts = self.__td2 - self.__nbPtSignal
+        self.__missingPts = self.td2 - self.__nbPtSignal
 
 #%%----------------------------------------------------------------------------
 ### PROCESSING
@@ -135,7 +135,6 @@ def apod_cos(data_fid):
         raise NotImplementedError(
             'Data of dimensions higher than 2 are not supported')
     return data_apod
-
 
 def spc(data_fid):
     """
@@ -166,7 +165,6 @@ def spc(data_fid):
         data_spc, data_fid.dw, data_fid.de,
         data_fid.firstDec, data_fid.nbEcho, data_fid.fullEcho)
     return data_spc
-
 
 def phase(data_spc, dic):
     """

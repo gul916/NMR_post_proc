@@ -79,7 +79,7 @@ def signal_generation():
         deb = i*halfEcho
         fin = (i+1)*halfEcho-dw2
         timei = np.linspace(deb,fin,nbPtHalfEcho)
-        if(desc==True):
+        if desc == True:
             tzero = i*halfEcho
         else:
             tzero = (i+1)*halfEcho
@@ -121,7 +121,7 @@ def signal_generation():
     
     return Aref, Adead, Anoisy
 
-def signal_plot(Aref, Adead, Anoisy):
+def plot_function(Aref, Adead, Anoisy):
     # keep only a half echo for ArefSPC
     if firstDec == True:
         ArefSPC = postproc.Signal(
@@ -140,7 +140,7 @@ def signal_plot(Aref, Adead, Anoisy):
     plt.ion()                           # interactive mode on
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal synthesis', fontsize=16)
-    vert_scale = abs(max(Aref.data.real))
+    vert_scale = abs(max(Aref.data.real)) * 1.1
 
     # Reference FID display
     ax1 = fig1.add_subplot(411)
@@ -176,40 +176,16 @@ def signal_plot(Aref, Adead, Anoisy):
     # Avoid superpositions on figure
     fig1.tight_layout(rect=(0,0,1,0.95))
     fig1.show()                 # Display figure
-
+    
 def main():
     Aref, Adead, Anoisy = signal_generation()
-    signal_plot(Aref, Adead, Anoisy)
-
-#    np.savetxt('CPMG_FID.csv', np.transpose([s1.data.real, s1.data.imag]),\
-#            delimiter='\t', header='sep=\t', comments='')
-
-#    ###Values used to save CPMG_FID.csv, please don't overwrite this file.
-#    fullEcho = 10e-3
-#    nbEcho = 20                 # 38 for less than 8k points, 76 for more
-#    firstDec = True
-#    
-#    dw = 24e-6                  # dwell time between two points
-#    td = 32768                  # nb of real points + nb of imag points
-#    de = 96e-6                  # dead time before signal acquisition
-#    
-#    mean = 0
-#    std = 0.1
-#    
-#    t21 = 500e-3
-#    t21star = 1e-3
-#    nu1 = 1750
-#    
-#    t22 = 100e-3
-#    t22star = 0.5e-3
-#    nu2 = -2500
-
-    input('\nPress enter key to exit') # wait before closing figure
-
+    plot_function(Aref, Adead, Anoisy)
+    return Anoisy
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main()
+    _ = main()
+    input('\nPress enter key to exit') # wait before closing figure
