@@ -64,12 +64,10 @@ class Signal:
         return self.__de
     @de.setter
     def de(self, val):
-        if val < 0:
-            raise ValueError('de must be >= 0')
         self.__de = val
         if round((self.__de / self.__dw2) % 1, 2) not in (0.0, 1.0):
             warnings.warn('de is supposed to be a multiple of 2*dw')
-        self.__nbPtDeadTime = int(self.__de / self.__dw2)
+        self.nbPtDeadTime = int(self.__de / self.__dw2)
             
     
     @property

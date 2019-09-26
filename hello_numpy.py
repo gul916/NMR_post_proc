@@ -2,15 +2,18 @@
 # -*- coding: utf-8 -*-
 
 from CPython_init import CPYTHON_BIN, CPYTHON_LIB
-import subprocess
+from subprocess import Popen, PIPE
 
-print('\n\n\n---------------------------------------------')    # line jump
-print('hello_numpy.py started\n')
-
-# Call to standard python
 FILE = 'hello_numpy.py'
 CPYTHON_FILE = CPYTHON_LIB + FILE
-subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE)
 
-print('\nhello_numpy.py finished')
-print('---------------------------------------------')    # line jump
+# Call to standard python
+#subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE)
+p = Popen([CPYTHON_BIN, CPYTHON_FILE], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+output, err = p.communicate()
+rc = p.returncode
+
+SHOW_STATUS('hello_numpy in progress')
+# Display result
+VIEWTEXT(title='hello_numpy', header='Output of hello_numpy script',
+     text=output+'\n'+err, modal=0)

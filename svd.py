@@ -47,8 +47,9 @@ else:
     XFB()
 
 # SVD options
-options = INPUT_DIALOG('SVD options', '', ['k_thres = ', 'max_err'], \
-    ['0', '7.5'], ['0: automatic thresholding\n>0: manual thresholding', \
+options = INPUT_DIALOG(
+    'SVD options', '', ['k_thres = ', 'max_err = '], ['0', '7.5'],
+    ['0: automatic thresholding\n>0: manual thresholding',
     'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
 
 # Call to standard python

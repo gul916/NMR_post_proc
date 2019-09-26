@@ -26,9 +26,10 @@ import sys
 import svd_auto
 
 # Default values
-k_thres = 0     # if 0, allows automatic thresholding
-                # from 1 to min(row, col): manual threshold (integer)
-max_err = 7.5   # error level for automatic thresholding, from 5 to 10 % (float)
+k_thres_global = 0      # if 0, allows automatic thresholding
+                        # from 1 to min(row, col): manual threshold (integer)
+max_err_global = 7.5    # error level for automatic thresholding,
+                        # from 5 to 10 % (float)
 
 #%%----------------------------------------------------------------------------
 ### IMPORT AND EXPORT DATA
@@ -197,7 +198,7 @@ def toeplitz_vector(mat):
         data[i] = np.mean(np.diag(mat[:,:],i-row+1))
     return data
 
-def denoise(data, k_thres, max_err):
+def denoise(data, k_thres='auto', max_err='auto'):
     """
     Denoise one- or two-dimensional data using Singular Value Decomposition
     Usage:  data_den, k_thres = denoise(data)
@@ -210,6 +211,10 @@ def denoise(data, k_thres, max_err):
     Output: data_den    denoised data (array)
             k_thres     number of values used for thresholding
     """
+    if k_thres == 'auto':
+        k_thres = k_thres_global
+    if max_err == 'auto':
+        max_err = max_err_global
     # Single precision to decrease computation time
     data, typ = precision_single(data)
     # SVD Denoising with thresholding
@@ -329,7 +334,7 @@ def plot_data(dic, data_apod, data_den, k_thres):
 #%%----------------------------------------------------------------------------
 ### MAIN FUNCTION
 ###----------------------------------------------------------------------------
-def denoise_io(data_dir, data_den_dir, k_thres, max_err):
+def denoise_io(data_dir, data_den_dir, k_thres='auto', max_err='auto'):
     """
     Import, denoise, plot and export data
     Usage:  denoise_io(data_dir)

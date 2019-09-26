@@ -17,10 +17,13 @@ import time
 # CPU library
 import scipy.linalg as sp_linalg
 # GPU libraries
-import pycuda.autoinit                          # needed
-import pycuda.gpuarray as gpuarray
-import skcuda.linalg as cu_linalg
-cu_linalg.init()                                # needed
+try:
+    import pycuda.autoinit                          # needed
+    import pycuda.gpuarray as gpuarray
+    import skcuda.linalg as cu_linalg
+    cu_linalg.init()                                # needed
+except:
+    lib = 'scipy'
 
 # Default value
 cpu_gpu_lim = 4096  # Number of columns to switch denoising hardware.
