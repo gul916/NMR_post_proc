@@ -1,6 +1,6 @@
 # NMR_post_proc
 Post Processing of NMR Bruker data using Topspin software
-Written by Guillaume LAURENT and Pierre-Aymeric GILLES in 2017
+Written by Guillaume LAURENT and Pierre-Aymeric GILLES in 2017-2019
 
 
 ### Introduction
@@ -12,7 +12,7 @@ Two kinds of files are present in this repository :
 ### Prerequisites
 - Install Bruker Topspin
 - Install Anaconda Python. It uses Intel MKL library which is especially fast.
-- Install nmrglue : pip install nmrglue-0.7-py2.py3-none-any.whl
+- Install nmrglue: pip install nmrglue-0.7-py2.py3-none-any.whl
 
 
 ### Installation under windows
@@ -36,8 +36,8 @@ Two kinds of files are present in this repository :
 
 
 ### Tests
-- Enter hello_numpy in Topspin command line. In Topspin terminal, you should see various libraries refering to anaconda and MKL
-- Open a processed 1D or 2D dataset. Enter hello_nmrglue in Topspin command line. You should see a figure of the corresponding spectrum. Furthermore, in Topspin terminal, you should see "NMRglue successfully tested"
+- Enter hello_numpy in Topspin command line. In Topspin, you should see a message window with various libraries refering to anaconda and MKL.
+- Open a processed 1D or 2D dataset. Enter hello_nmrglue in Topspin command line. You should see a figure of the corresponding spectrum.
 
 
 ### Further CPython_init.py modifications
