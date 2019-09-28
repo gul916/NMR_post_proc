@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from CPython_init import CPYTHON_BIN, CPYTHON_LIB
-import subprocess
+from subprocess import Popen, PIPE
+
+FILE = 'snr.py'
+CPYTHON_FILE = CPYTHON_LIB + FILE
 
 def fullpath(dataset):
     dat=dataset[:]      # copy the original array
@@ -22,8 +25,13 @@ nois_lim_1 = GETPAR2('NOISF1')
 nois_lim_2 = GETPAR2('NOISF2')
 
 # Call to standard python
-FILE = 'snr.py'
-CPYTHON_FILE = CPYTHON_LIB + FILE
-subprocess.call(CPYTHON_BIN + ' ' + CPYTHON_FILE + ' ' + fulldataPATH \
-                 + ' ' + sig_lim_1 + ' ' + sig_lim_2 \
-                 + ' ' + nois_lim_1 + ' ' + nois_lim_2)
+SHOW_STATUS('snr in progress')
+p = Popen([
+    CPYTHON_BIN, CPYTHON_FILE, fulldataPATH,
+    sig_lim_1, sig_lim_2, nois_lim_1, nois_lim_2],
+    stdin=PIPE, stdout=PIPE, stderr=PIPE)
+output, err = p.communicate()
+
+# Display result
+VIEWTEXT(title='snr', header='Output of snr script',
+     text=output+'\n'+err, modal=0)

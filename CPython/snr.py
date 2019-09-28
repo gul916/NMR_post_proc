@@ -20,13 +20,13 @@ def data_import():
     if (len(sys.argv) >= 2) and (os.path.isdir(sys.argv[1])):
         data_dir = str(sys.argv[1])
     else:
-        raise ValueError \
-            ('Please provide SPC data directory as first argument')
+        raise ValueError(
+            'Please provide SPC data directory as first argument')
     # Import data with nmrglue
     dic, data = ng.bruker.read_pdata(data_dir)
     if data.ndim != 1:
-        raise NotImplementedError \
-            ("SNR on", data.ndim, "dimensions is not yet supported.")
+        raise NotImplementedError(
+            "SNR on", data.ndim, "dimensions is not yet supported.")
     udic = ng.bruker.guess_udic(dic, data)    # convert to universal dictionary
     uc = ng.fileiobase.uc_from_udic(udic)
     ppm_scale = uc.ppm_scale()
@@ -36,20 +36,22 @@ def data_import():
     ax.plot(ppm_scale, data.real)
     ax.get_yaxis().set_visible(False)
 #    ax.get_xaxis().set_visible(False)
-    ax.axis([ppm_scale[0], ppm_scale[-1], \
-             np.min(data.real)*1.1, np.max(data.real)*1.1])
+    ax.axis([
+        ppm_scale[0], ppm_scale[-1],
+        np.min(data.real)*1.1, np.max(data.real)*1.1])
     plt.pause(0.1)                                      # to update display
     return ppm_scale, data
 
 def limits_check(ppm_scale, signal_lim, noise_lim):
-    if (ppm_scale[0] >= signal_lim[0] >= ppm_scale[-1]) \
-        and (ppm_scale[0] >= signal_lim[1] >= ppm_scale[-1]) \
-        and (signal_lim[0] > signal_lim[1]) \
-        and (ppm_scale[0] >= noise_lim[0] >= ppm_scale[-1]) \
-        and (ppm_scale[0] >= noise_lim[1] >= ppm_scale[-1]) \
-        and (noise_lim[0] > noise_lim[1]) \
-        and not (noise_lim[0] > signal_lim[0] > noise_lim[1]) \
-        and not (noise_lim[0] > signal_lim[1] > noise_lim[1]):
+    if (
+            (ppm_scale[0] >= signal_lim[0] >= ppm_scale[-1])
+            and (ppm_scale[0] >= signal_lim[1] >= ppm_scale[-1])
+            and (signal_lim[0] > signal_lim[1])
+            and (ppm_scale[0] >= noise_lim[0] >= ppm_scale[-1])
+            and (ppm_scale[0] >= noise_lim[1] >= ppm_scale[-1])
+            and (noise_lim[0] > noise_lim[1])
+            and not (noise_lim[0] > signal_lim[0] > noise_lim[1])
+            and not (noise_lim[0] > signal_lim[1] > noise_lim[1])):
         pass
     else:
         raise ValueError('Invalid signal or noise region. Please check.')
@@ -69,8 +71,8 @@ def limits_define(ppm_scale, data):
         signal_lim = [float(sys.argv[2]), float(sys.argv[3])]
         noise_lim = [float(sys.argv[4]), float(sys.argv[5])]
     else:
-        raise ValueError \
-            ('Please provide signal and noise regions as 3rd to 6th arguments')
+        raise ValueError(
+            'Please provide signal and noise regions as 3rd to 6th arguments')
     # Check limits
     limits_check(ppm_scale, signal_lim, noise_lim)
     
@@ -78,13 +80,15 @@ def limits_define(ppm_scale, data):
     ax = plt.gca()
     ax.axvline(x=signal_lim[0], color='g', linestyle=':', linewidth=2)
     ax.axvline(x=signal_lim[1], color='g', linestyle=':', linewidth=2)
-    ax.text(np.mean(signal_lim), np.max(data)*1.03, 'signal', \
+    ax.text(
+        np.mean(signal_lim), np.max(data)*1.03, 'signal',
         color='g', ha='center')
     plt.pause(0.1)                                      # to update display
     # Plot noise limits
     ax.axvline(x=noise_lim[0], color='r', linestyle=':', linewidth=2)
     ax.axvline(x=noise_lim[1], color='r', linestyle=':', linewidth=2)
-    ax.text(np.mean(noise_lim), np.max(data)*1.03, 'noise', \
+    ax.text(
+        np.mean(noise_lim), np.max(data)*1.03, 'noise',
         color='r', ha='center')
     plt.pause(0.1)                                      # to update display
 
@@ -94,10 +98,12 @@ def limits_convert(ppm_scale, signal_lim, noise_lim):
     signal_ind = np.zeros(2, dtype=int)
     noise_ind = np.zeros(2, dtype=int)
     for i in range(2):
-        signal_ind[i] = int(np.floor((ppm_scale[0]-signal_lim[i]) \
-              * ppm_scale.size / (ppm_scale[0]-ppm_scale[-1])))
-        noise_ind[i] = int(np.floor((ppm_scale[0]-noise_lim[i]) \
-              * ppm_scale.size / (ppm_scale[0]-ppm_scale[-1])))
+        signal_ind[i] = (
+            int(np.floor((ppm_scale[0]-signal_lim[i])
+            * ppm_scale.size / (ppm_scale[0]-ppm_scale[-1]))))
+        noise_ind[i] = (
+            int(np.floor((ppm_scale[0]-noise_lim[i]) \
+            * ppm_scale.size / (ppm_scale[0]-ppm_scale[-1]))))
     return signal_ind, noise_ind
 
 def signal_noise(ppm_scale, data, signal_lim, noise_lim):
@@ -123,8 +129,9 @@ def signal_noise(ppm_scale, data, signal_lim, noise_lim):
     
     # Plot horizontal limits
     ax = plt.gca()
-    plt.title(r'${PSNR}_{rms} = $' + '{:.1f}, '.format(psnr_rms) \
-        + r'${PSNR}_{max} = $' + '{:.1f}, '.format(psnr_max) \
+    plt.title(
+        r'${PSNR}_{rms} = $' + '{:.1f}, '.format(psnr_rms)
+        + r'${PSNR}_{max} = $' + '{:.1f}, '.format(psnr_max)
         + r'$SNR = $' + '{:.1f}'.format(snr))
 #    plt.title(r'${PSNR}_{rms} = $' + '{:.1f}'.format(psnr_rms))
     ax.axhline(y=Lc, color='tab:red', linestyle=':', linewidth=2)

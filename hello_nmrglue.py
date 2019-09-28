@@ -32,13 +32,14 @@ if fulldata_new == fulldata:
     EXIT()
 
 # Call to standard python
+COMMAND_LINE = " ".join(
+    str(elm) for elm in [CPYTHON_BIN, CPYTHON_FILE, fulldata_new])
 SHOW_STATUS('hello_nmrglue in progress')
-p = Popen(
-    [CPYTHON_BIN, CPYTHON_FILE, fulldata_new],
-    stdin=PIPE, stdout=PIPE, stderr=PIPE)
+p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 
 # Display result
 RE(dataset_new)
-VIEWTEXT(title='hello_nmrglue', header='Output of hello_nmrglue script',
-     text=output+'\n'+err, modal=0)
+VIEWTEXT(
+    title='hello_nmrglue', header='Output of hello_nmrglue script',
+    text=output+'\n'+err, modal=0)
