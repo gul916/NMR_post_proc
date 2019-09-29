@@ -147,7 +147,6 @@ def signal_noise(ppm_scale, data, signal_lim, noise_lim):
     plt.show()                                      # to allow zooming
 
 def main():
-    print('\n\n\n---------------------------------------------')    # line jump
     try:
         ppm_scale, data = data_import()
         signal_lim, noise_lim = limits_define(ppm_scale, data)
@@ -157,7 +156,6 @@ def main():
         for i in range(1, len(sys.argv)):
             print('Argument', i, '=', sys.argv[i])
     print('snr.py finished')
-    print('---------------------------------------------')          # line jump
 
 #%%----------------------------------------------------------------------------
 ### IF PROGRAM IS DIRECTLY EXECUTED

@@ -25,11 +25,11 @@ nois_lim_1 = GETPAR2('NOISF1')
 nois_lim_2 = GETPAR2('NOISF2')
 
 # Call to standard python
-SHOW_STATUS('snr in progress')
-p = Popen([
+COMMAND_LINE = " ".join(str(elm) for elm in [
     CPYTHON_BIN, CPYTHON_FILE, fulldataPATH,
-    sig_lim_1, sig_lim_2, nois_lim_1, nois_lim_2],
-    stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    sig_lim_1, sig_lim_2, nois_lim_1, nois_lim_2])
+SHOW_STATUS('snr in progress')
+p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 
 # Display result

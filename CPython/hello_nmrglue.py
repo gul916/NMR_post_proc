@@ -6,10 +6,96 @@ import nmrglue as ng
 import numpy as np
 import sys
 
+def data_import():
+    # Import data
+    if len(sys.argv) == 1:
+        raise NotImplementedError(
+            "Please enter the directory of the Bruker file.")
+    elif len(sys.argv) == 2:
+        data_dir = sys.argv[1]
+    elif len(sys.argv) >= 3:
+        raise NotImplementedError("There should be only one argument.")
+    dic, data = ng.bruker.read(data_dir)
+    return dic, data, data_dir
+
+def data_export(dic, data, data_dir):
+    # Write data
+    # Data should have exatly the original processed size (bug #109)
+    scaling = 8
+    if data.ndim == 1:
+        ng.bruker.write_pdata(
+            data_dir, dic, data.real*scaling,
+            scale_data=True, bin_file='1r', overwrite=True)
+        ng.bruker.write_pdata(
+            data_dir, dic, data.imag*scaling,
+            scale_data=True, bin_file='1i', overwrite=True)
+    elif data.ndim == 2:
+        datarr = data[::2,:].real
+        datari = data[1::2,:].real
+        datair = data[::2,:].imag
+        dataii = data[1::2,:].imag
+        ng.bruker.write_pdata(
+            data_dir, dic, datarr*scaling,
+            scale_data=True, bin_file='2rr', overwrite=True)
+        ng.bruker.write_pdata(
+            data_dir, dic, datari*scaling,
+            scale_data=True, bin_file='2ri', overwrite=True)
+        ng.bruker.write_pdata(
+            data_dir, dic, datair*scaling,
+            scale_data=True, bin_file='2ir', overwrite=True)
+        ng.bruker.write_pdata(
+            data_dir, dic, dataii*scaling,
+            scale_data=True, bin_file='2ii', overwrite=True)
+    else:
+        raise NotImplementedError(
+            "Data of", data.ndim, "dimensions are not yet supported.")
+
+def preproc(dic, data):
+    # Preprocessing
+    # Direct dimension processing
+    data = ng.bruker.remove_digital_filter(dic, data)   # digital filtering
+    data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
+    if data.ndim == 2:                      # Indirect dimension processing
+        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
+        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
+        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
+    elif data.ndim > 2:
+        raise NotImplementedError(
+            "Data of", data.ndim, "dimensions are not yet supported.")
+    return data
+
+def postproc(dic, data):
+    # Direct dimension processing
+    data = ng.proc_base.zf_size(data, dic['procs']['SI'])   # zero-filling
+    if data.ndim == 1:
+        data[0] /= 2                                        # normalization
+    elif data.ndim == 2:
+        data[:, 0] /= 2                                     # normalization
+    else:
+        raise NotImplementedError(
+            "Data of", data.ndim, "dimensions are not yet supported.")
+    data = ng.proc_base.fft_norm(data)                      # FFT with norm
+    data = ng.proc_base.rev(data)                           # revert spectrum
+    print("Autophasing:")
+    data = ng.proc_autophase.autops(data, 'acme')           # autophasing
+    if data.ndim == 2:
+        # Indirect dimension processing
+        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
+        data = ng.proc_base.zf_size(data, dic['proc2s']['SI'])  # zero-filling
+        data[:, 0] /= 2                                     # normalization
+        data = ng.proc_base.fft_norm(data)                  # FFT with norm
+        if dic['acqu2s']['FnMODE'] == 4:                    # STATES
+            pass
+        elif dic['acqu2s']['FnMODE'] == 5:                  # STATES-TPPI
+            data = np.fft.fftshift(data, axes=-1)           # swap spectrum
+        data = ng.proc_base.rev(data)                       # revert spectrum
+        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
+    baseline = [0, data.shape[-1]-1]
+    data = ng.proc_bl.base(data, baseline)          # baseline correction
+    return data
 
 def plotting(dic, data):
     fig = plt.figure()
-    plt.rc('image', cmap='viridis')                 # color map
     if data.ndim == 1:
         # Scaling
         udic = ng.bruker.guess_udic(dic, data)      # Universal dictionary
@@ -58,82 +144,13 @@ def plotting(dic, data):
     plt.tight_layout()
     plt.show()
 
-def test_nmrglue(data_dir):
-    # Import data
-    dic, data = ng.bruker.read(data_dir)
-    if data.ndim == 1:
-        # 1D processing
-        data = ng.bruker.remove_digital_filter(dic, data)   # digital filtering
-        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
-        data = ng.proc_base.zf_size(data, dic['procs']['SI'])   # zero-filling
-        data[0] /= 2                                        # normalization
-        data = ng.proc_base.fft_norm(data)                  # FFT with norm
-        data = ng.proc_base.rev(data)                       # revert spectrum
-        data = ng.proc_autophase.autops(data, 'acme')       # autophasing
-        # Write data
-        # Data should have exatly the original processed size (bug #109)
-        ng.bruker.write_pdata(
-            data_dir, dic, data.real*8,
-            scale_data=True, bin_file='1r', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, data.imag*8,
-            scale_data=True, bin_file='1i', overwrite=True)
-    elif data.ndim == 2:
-        # Direct dimension processing
-        data = ng.bruker.remove_digital_filter(dic, data)   # digital filtering
-        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
-        data = ng.proc_base.zf_size(data, dic['procs']['SI'])   # zero-filling
-        data[:, 0] /= 2                                     # normalization
-        data = ng.proc_base.fft_norm(data)                  # FFT with norm
-        data = ng.proc_base.rev(data)                       # revert spectrum
-        data = ng.proc_autophase.autops(data, 'acme')       # autophasing
-        # Indirect dimension processing
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
-        data = ng.proc_base.zf_size(data, dic['proc2s']['SI'])  # zero-filling
-        data[:, 0] /= 2                                     # normalization
-        data = ng.proc_base.fft_norm(data)                  # FFT with norm
-        if dic['acqu2s']['FnMODE'] == 4:                    # STATES
-            pass
-        elif dic['acqu2s']['FnMODE'] == 5:                  # STATES-TPPI
-            data = np.fft.fftshift(data, axes=-1)           # swap spectrum
-        data = ng.proc_base.rev(data)                       # revert spectrum
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-        datarr = data[::2,:].real
-        datari = data[1::2,:].real
-        datair = data[::2,:].imag
-        dataii = data[1::2,:].imag
-        # Write data
-        # Data should have exatly the original processed size (bug #109)
-        ng.bruker.write_pdata(
-            data_dir, dic, datarr*8,
-            scale_data=True, bin_file='2rr', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, datari*8,
-            scale_data=True, bin_file='2ri', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, datair*8,
-            scale_data=True, bin_file='2ir', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, dataii*8,
-            scale_data=True, bin_file='2ii', overwrite=True)
-    else:
-        raise NotImplementedError(
-            "Data of", data.ndim, "dimensions are not yet supported.")
-    plotting(dic, data)
-
-
 def main():
     try:
-        if len(sys.argv) == 1:
-            raise NotImplementedError(
-                "Please enter the directory of the Bruker file.")
-        elif len(sys.argv) == 2:
-            data_dir = sys.argv[1]
-            test_nmrglue(data_dir)
-        elif len(sys.argv) >= 3:
-            raise NotImplementedError("There should be only one argument.")
-    
+        dic, data, data_dir = data_import()
+        data = preproc(dic, data)
+        data = postproc(dic, data)
+        data_export(dic, data, data_dir)
+        plotting(dic, data)
     except NotImplementedError as err:
         print("Error:", err)
         for i in range(0, len(sys.argv)):
@@ -141,11 +158,12 @@ def main():
     except OSError as err:
         print("Error:", err)
     else:                                           # When no error occured
-        print("\nNMRglue was successfully tested")
+        print("\nNMRglue was successfully tested:")
+        print("importation, digital filtering, fft, autophasing,")
+        print("baseline correction, and saving")
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
-
 if __name__ == "__main__":
     main()
