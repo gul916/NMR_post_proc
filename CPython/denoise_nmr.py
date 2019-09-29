@@ -20,17 +20,12 @@ import numpy as np
 import os.path
 import scipy.linalg as sp_linalg
 import sys
-
 # User defined libraries
-# Needs file svd_auto.py with scikit-cuda, pycuda, CUDA toolkit and CULA library
-import hello_nmrglue as hng
+# svd_auto.py needs scikit-cuda, pycuda, CUDA toolkit and CULA library
+import postproc
 import svd_auto
 
 # Default values
-k_thres_global = 0      # if 0, allows automatic thresholding
-                        # from 1 to min(row, col): manual threshold (integer)
-max_err_global = 7.5    # error level for automatic thresholding,
-                        # from 5 to 10 % (float)
 k_thres = 'auto'
 max_err = 'auto'
 
@@ -106,10 +101,6 @@ def denoise(data, k_thres='auto', max_err='auto'):
     Output: data_den    denoised data (array)
             k_thres     number of values used for thresholding
     """
-    if k_thres == 'auto':
-        k_thres = k_thres_global
-    if max_err == 'auto':
-        max_err = max_err_global
     # Single precision to decrease computation time
     data, typ = precision_single(data)
     # SVD Denoising with thresholding
@@ -137,8 +128,8 @@ def plot_data(dic, data_apod, data_den, k_thres):
     Output: data_den     FFT of data_den
     """
     fig = plt.figure()
-    data_apod_spc = hng.postproc(dic, data_apod)        # FFT and phasing
-    data_den_spc = hng.postproc(dic, data_den)
+    data_apod_spc = postproc.postproc_data(dic, data_apod)  # FFT and phasing
+    data_den_spc = postproc.postproc_data(dic, data_den)
     if data_apod.ndim == 1:                             # 1D data set
         # FID scale
         udic = ng.bruker.guess_udic(dic, data_apod)     # universal dictionary
@@ -241,15 +232,15 @@ def denoise_io(data_dir, k_thres='auto', max_err='auto'):
     """
     try:
         # Import data and apply apodisation
-        dic, data = ng.bruker.read(data_dir)
-        data_apod = hng.preproc(dic, data)
+        dic, data = postproc.import_data(data_dir)
+        data_apod = postproc.preproc_data(dic, data)
         
         # Denoise data, Fourier transform, and plot
         data_den, k_thres = denoise(data_apod, k_thres, max_err)
         data_den = plot_data(dic, data_apod, data_den, k_thres)
         
         # Export data
-        hng.export_data(dic, data_den, data_dir)
+        postproc.export_data(dic, data_den, data_dir)
         
     except KeyError as err:                             # writing data
         print('Error: unable to write data. Missing key:', err)

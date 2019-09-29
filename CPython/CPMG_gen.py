@@ -8,7 +8,6 @@
 # Python libraries
 import matplotlib.pyplot as plt
 import numpy as np
-
 # User defined library
 import postproc
 

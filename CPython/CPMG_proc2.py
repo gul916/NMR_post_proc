@@ -50,7 +50,7 @@ def echo_apod(old):
 
 def denoise_CPMG(old):
     new = old.data.copy()
-    new, k_thres = denoise_nmr.denoise(new, 0, 7.5)
+    new, k_thres = denoise_nmr.denoise(new)
     new = postproc.Signal(
         new, old.dw, old.de,
         old.firstDec, old.nbEcho, old.fullEcho)

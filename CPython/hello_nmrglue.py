@@ -1,102 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Python libraries
 import matplotlib.pyplot as plt
 import nmrglue as ng
 import numpy as np
 import sys
-import time
-
-def import_data():
-    # Import data
-    if len(sys.argv) == 1:
-        raise NotImplementedError(
-            "Please enter the directory of the Bruker file.")
-    elif len(sys.argv) == 2:
-        data_dir = sys.argv[1]
-    elif len(sys.argv) >= 3:
-        raise NotImplementedError("There should be only one argument.")
-    dic, data = ng.bruker.read(data_dir)
-    return dic, data, data_dir
-
-def export_data(dic, data, data_dir):
-    # Write data
-    # Data should have exatly the original processed size (bug #109)
-    scaling = 8
-    if data.ndim == 1:
-        ng.bruker.write_pdata(
-            data_dir, dic, data.real*scaling,
-            scale_data=True, bin_file='1r', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, data.imag*scaling,
-            scale_data=True, bin_file='1i', overwrite=True)
-    elif data.ndim == 2:
-        datarr = data[::2,:].real
-        datari = data[1::2,:].real
-        datair = data[::2,:].imag
-        dataii = data[1::2,:].imag
-        ng.bruker.write_pdata(
-            data_dir, dic, datarr*scaling,
-            scale_data=True, bin_file='2rr', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, datari*scaling,
-            scale_data=True, bin_file='2ri', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, datair*scaling,
-            scale_data=True, bin_file='2ir', overwrite=True)
-        ng.bruker.write_pdata(
-            data_dir, dic, dataii*scaling,
-            scale_data=True, bin_file='2ii', overwrite=True)
-    else:
-        raise NotImplementedError(
-            "Data of", data.ndim, "dimensions are not yet supported.")
-
-def preproc(dic, data):
-    # Preprocessing
-    # Direct dimension processing
-    data = ng.bruker.remove_digital_filter(dic, data)   # digital filtering
-    data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)     # apodization
-    # Indirect dimension processing
-    if data.ndim == 2:
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-    elif data.ndim > 2:
-        raise NotImplementedError(
-            "Data of", data.ndim, "dimensions are not yet supported.")
-    return data
-
-def postproc(dic, data):
-    # Postprocessing
-    # Direct dimension
-    data = ng.proc_base.zf_size(data, dic['procs']['SI'])   # zero-filling
-    if data.ndim == 1:
-        data[0] /= 2                                        # normalization
-    elif data.ndim == 2:
-        data[:, 0] /= 2                                     # normalization
-    else:
-        raise NotImplementedError(
-            "Data of", data.ndim, "dimensions are not yet supported.")
-    data = ng.proc_base.fft_norm(data)                      # FFT with norm
-    data = ng.proc_base.rev(data)                           # revert spectrum
-    print("Autophasing:")
-    t_0 = time.time()
-    data = ng.proc_autophase.autops(data, 'acme')           # autophasing
-    t_1 = time.time()
-    print('Autophasing time:             {:8.2f} s\n'.format(t_1 - t_0))
-    if data.ndim == 2:
-        # Indirect dimension
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-        data = ng.proc_base.zf_size(data, dic['proc2s']['SI'])  # zero-filling
-        data[:, 0] /= 2                                     # normalization
-        data = ng.proc_base.fft_norm(data)                  # FFT with norm
-        if dic['acqu2s']['FnMODE'] == 4:                    # STATES
-            pass
-        elif dic['acqu2s']['FnMODE'] == 5:                  # STATES-TPPI
-            data = np.fft.fftshift(data, axes=-1)           # swap spectrum
-        data = ng.proc_base.rev(data)                       # revert spectrum
-        data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-    return data
+# User defined library
+import postproc
 
 def plotting(dic, data):
     fig = plt.figure()
@@ -150,11 +61,20 @@ def plotting(dic, data):
 
 def main():
     try:
-        dic, data, data_dir = import_data()
-        data = preproc(dic, data)
-        data = postproc(dic, data)
-        export_data(dic, data, data_dir)
+        if len(sys.argv) == 1:
+            raise NotImplementedError(
+                "Please enter the directory of the Bruker file.")
+        elif len(sys.argv) == 2:
+            data_dir = sys.argv[1]
+        elif len(sys.argv) >= 3:
+            raise NotImplementedError("There should be only one argument.")
+        
+        dic, data = postproc.import_data(data_dir)
+        data = postproc.preproc_data(dic, data)
+        data = postproc.postproc_data(dic, data)
+        postproc.export_data(dic, data, data_dir)
         plotting(dic, data)
+    
     except NotImplementedError as err:
         print("Error:", err)
         for i in range(0, len(sys.argv)):

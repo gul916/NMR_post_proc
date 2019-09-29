@@ -24,14 +24,16 @@ try:
     cu_linalg.init()                                # needed
 except:
     lib = 'scipy'
+else:
+    lib = 'auto'
 
 # Default value
-cpu_gpu_lim = 4096  # Number of columns to switch denoising hardware.
-                    # Under this value, processor is used.
-                    # Starting with this value, graphic card is used
-                    
-                    # Run this file directly and adjust this value
-                    # accordingly to your hardware
+# Run this file directly and adjust this value accordingly to your hardware
+cpu_gpu_lim = 4096      # Number of columns to switch denoising hardware.
+                        # Under this value, processor is used.
+                        # Starting with this value, graphic card is used
+max_err_global = 7.5    # error level for automatic thresholding,
+                        # from 5 to 10 % (float)
 
 #%%----------------------------------------------------------------------------
 ### PRE-, POST-PROCESSING AND LIBRARY IMPORT
@@ -117,7 +119,6 @@ def svd_scipy(X, typ):
     """
     X = X.astype(typ)
     U, S, Vt = sp_linalg.svd(X, full_matrices=False)
-    t_1 = time.time()
     return U, S, Vt
 
 def svd_skcuda(X, typ):
@@ -201,7 +202,7 @@ def thres_ind(S, m, n):                                 # Indicator function
     print('IND thresholding:          {:8d} values'.format(k_ind))
     return k_ind, params_ind
 
-def thres_sl(S, X, max_err):                            # Significant level
+def thres_sl(S, X, max_err='auto'):                     # Significant level
     """
     Automatic thresholding using Significant Level (SL)
     Factor Analysis in Chemistry, Third Edition, p387-389
@@ -213,6 +214,8 @@ def thres_sl(S, X, max_err):                            # Significant level
     Output: k_sl        significant level SL (integer)
     """
     t_0 = time.time()
+    if max_err == 'auto':
+        max_err = max_err_global
     m, n = X.shape
     if m < n:
         raise ValueError(
@@ -267,7 +270,7 @@ def thres_sl(S, X, max_err):                            # Significant level
     print('Thresholding time:            {:8.2f} s'.format(t_1 - t_0))
     return k_sl
 
-def threshold(S, X, k_thres, max_err):
+def threshold(S, X, k_thres='auto', max_err='auto'):
     """
     Manual or automatic threshold
     Usage:  k_thres = threshold(S, X, k_thres, max_err)
@@ -277,7 +280,7 @@ def threshold(S, X, k_thres, max_err):
             max_err     maximum error level to discriminate signal and noise
     Output: k_thres     checked threshold (integer)
     """
-    if k_thres == 0:                                    # automatic
+    if (k_thres == 0) or (k_thres == 'auto'):           # automatic
         k_thres = thres_sl(S, X, max_err)
     elif (k_thres >= 1) and (k_thres <= min(X.shape)):  # manual
         print('Manual thresholding: \t\t{:8d} values' \
@@ -350,7 +353,7 @@ def lowrank(U, S, Vt, k_thres, lib, typ):
 #%%----------------------------------------------------------------------------
 ### MAIN FUNCTION
 ###----------------------------------------------------------------------------
-def svd_auto(X, k_thres=0, max_err=7.5, lib='auto', disp_err=False):
+def svd_auto(X, k_thres='auto', max_err='auto', lib=lib, disp_err=False):
     """
     Singular Value Decomposition (SVD) and low-rank approximation
     Usage:  Xk, k_thres = svd_auto(X)
