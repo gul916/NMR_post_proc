@@ -8,7 +8,7 @@ and thresholding of a one- or two-dimensional NMR FID (time domain).
 
 Needs nmrglue.
 
-G. Laurent, P.-A. Gilles, W. Woelffel, V. Barret-Vivin, E. Gouillart, et C. Bonhomme,
+G. Laurent, P.-A. Gilles, W. Woelffel, V. Barret-Vivin, E. Gouillart, and C. Bonhomme,
 « Denoising applied to spectroscopies – Part II: Decreasing computation time »,
 Appl. Spectrosc. Rev., 2019, doi: 10.1080/05704928.2018.1559851
 """
@@ -23,6 +23,7 @@ import sys
 
 # User defined libraries
 # Needs file svd_auto.py with scikit-cuda, pycuda, CUDA toolkit and CULA library
+import hello_nmrglue as hng
 import svd_auto
 
 # Default values
@@ -30,114 +31,8 @@ k_thres_global = 0      # if 0, allows automatic thresholding
                         # from 1 to min(row, col): manual threshold (integer)
 max_err_global = 7.5    # error level for automatic thresholding,
                         # from 5 to 10 % (float)
-
-#%%----------------------------------------------------------------------------
-### IMPORT AND EXPORT DATA
-###----------------------------------------------------------------------------
-def import_data(data_dir, data_den_dir):
-    """
-    Import data
-    Usage:  dic, data, data_den_dir = import_data(data_dir, data_den_dir)
-    Input:  data_dir     data directory (string)
-    Output: dic          data parameters (dictionary)
-            data         imported data (array)
-    """
-    print('\nNoisy data {:s}'.format(data_dir))
-    dic, data = ng.bruker.read(data_dir)                # import data
-    if data.ndim >= 3:
-        raise NotImplementedError \
-            ('Data of {:d} dimensions is not yet supported'.format(data.ndim))
-    data_den_dir = export_dir(data_dir, data_den_dir)
-    return dic, data, data_den_dir
-
-def export_dir(data_dir, data_den_dir):
-    """
-    Check if output directory exists
-    Usage:  data_den_dir = export_dir(data_dir, data_den_dir)
-    Input:  data_dir     original data directory (string)
-            data_den_dir denoised data directory (string or None)
-    Output: data_den_dir modified denoised data directory (string)
-    """
-    if data_den_dir == None:
-        if data_dir[-1] in ['/', '\\']:
-            data_den_dir = data_dir[:-1] + '_denoised/' # remove last character
-        else:
-            data_den_dir = data_dir[:] + '_denoised'
-        while os.path.isdir(data_den_dir):
-            print('\n{:s} directory exists'.format(data_den_dir))
-            overwrite = input('Overwrite denoised data (y/n) ? ')
-            if overwrite in ['Y', 'y']:
-                overwrite = True
-                break
-            if overwrite in ['N', 'n']:
-                raise ValueError ('Overwritten not allowed')
-    return data_den_dir
-
-def export_data(dic, data_den, data_den_dir):
-    """
-    Export data to file
-    Usage:  export_data(data_dir, dic, data, overw)
-    Input:  dic          data parameters (dictionary)
-            data_den     data to export (array)
-            data_den_dir data directory (string)
-    Output: none
-    """
-    ng.bruker.write(data_den_dir, dic, data_den, overwrite=True)
-    print('\nDenoised data saved to', data_den_dir)
-
-#%%----------------------------------------------------------------------------
-### PROCESSING
-###----------------------------------------------------------------------------
-def apod(data):
-    """
-    Apply cosine apodisation
-    Usage:  data_apod = apod(data)
-    Input:  data        data to process (array)
-    Output: data_apod   data apodized (array)
-    """
-    data_apod = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)
-    if data.ndim == 2:                                  # 2D data set
-        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
-        data_apod = ng.proc_base.sp(data_apod, off=0.5, end=1.0, pow=1.0)
-        data_apod = ng.proc_base.tp_hyper(data_apod)    # hypercomplex transpose
-    return data_apod
-
-def spc(dic, data_fid):
-    """
-    FFT of FID with normalization, zero-filling and phasing
-    Usage: data_spc = spc(dic, data_fid)
-    Input:  dic          data parameters (dictionary)
-            data_fid     data to transform
-    Output: data_spc     transformed data
-    """
-    data_fid1 = data_fid[:]                             # avoid corruption
-    data_fid1 = ng.proc_base.zf_auto(data_fid1)         # zero-filling 2^n
-    data_fid1 = ng.proc_base.zf_double(data_fid1, 2)    # zero-filling *4
-    if data_fid1.ndim == 1:                             # 1D data set
-        data_fid1[0] = data_fid1[0] / 2                 # normalization
-        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
-    elif data_fid1.ndim == 2:                           # 2D data set
-        # First dimension
-        data_fid1[:, 0] = data_fid1[:, 0] / 2           # normalization
-        data_spc = ng.proc_base.fft_norm(data_fid1)     # FFT with norm
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['procs']['PHC0'], dic['procs']['PHC1'], True)   # phasing
-        # Second dimension
-        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
-        data_spc = ng.proc_base.zf_auto(data_spc)       # zero-filling 2^n
-        data_spc = ng.proc_base.zf_double(data_spc, 2)  # zero-filling *4
-        data_spc[:, 0] = data_spc[:, 0] / 2             # normalization
-        data_spc = ng.proc_base.fft_norm(data_spc)      # FFT with norm
-        if dic['acqu2s']['FnMODE'] == 4:                # STATES
-            pass
-        elif dic['acqu2s']['FnMODE'] == 5:              # STATES-TPPI
-            data_spc = np.fft.fftshift(data_spc, axes=-1)       # swap spectrum
-        data_spc = ng.proc_base.ps(data_spc, \
-            dic['proc2s']['PHC0'], dic['proc2s']['PHC1'], True) # phasing
-        data_spc = ng.proc_base.tp_hyper(data_spc)      # hypercomplex transpose
-    return data_spc
+k_thres = 'auto'
+max_err = 'auto'
 
 #%%----------------------------------------------------------------------------
 ### DENOISE DATA
@@ -239,22 +134,22 @@ def plot_data(dic, data_apod, data_den, k_thres):
             data_apod    apodised noisy data (array)
             data_den     apodised denoised data (array)
             k_thres      number of values used for thresholding
-    Output: none
+    Output: data_den     FFT of data_den
     """
     fig = plt.figure()
-    data_spc = spc(dic, data_apod)                      # FFT and phasing
-    data_den_spc = spc(dic, data_den)
+    data_apod_spc = hng.postproc(dic, data_apod)        # FFT and phasing
+    data_den_spc = hng.postproc(dic, data_den)
     if data_apod.ndim == 1:                             # 1D data set
         # FID scale
         udic = ng.bruker.guess_udic(dic, data_apod)     # universal dictionary
         x_scale_fid = ng.fileiobase.uc_from_udic(udic).ms_scale()
-        min_y_fid, max_y_fid = [np.min(data_apod.real)*1.1, \
-                                np.max(data_apod.real)*1.1]
+        min_y_fid, max_y_fid = [
+            np.min(data_apod.real)*1.1, np.max(data_apod.real)*1.1]
         # SPC scale
-        udic = ng.bruker.guess_udic(dic, data_spc)      # universal dictionary
+        udic = ng.bruker.guess_udic(dic, data_apod_spc) # universal dictionary
         x_scale_spc = ng.fileiobase.uc_from_udic(udic).ppm_scale()
-        min_y_spc, max_y_spc = [np.min(data_spc.real)*1.1, \
-                                np.max(data_spc.real)*1.1]
+        min_y_spc, max_y_spc = [
+            np.min(data_apod_spc.real)*1.1, np.max(data_apod_spc.real)*1.1]
         # Figure
         ax1 = fig.add_subplot(221)
         ax1.set_title('Noisy FID')
@@ -269,7 +164,7 @@ def plot_data(dic, data_apod, data_den, k_thres):
         ax3 = fig.add_subplot(223)
         ax3.set_title('Noisy SPC')
         ax3.set_xlabel('ppm')
-        ax3.plot(x_scale_spc, data_spc.real)
+        ax3.plot(x_scale_spc, data_apod_spc.real)
         ax3.axis([x_scale_spc[0], x_scale_spc[-1], min_y_spc, max_y_spc])
         ax4 = fig.add_subplot(224)
         ax4.set_title('Denoised SPC, k = {:d}'.format(k_thres))
@@ -279,10 +174,9 @@ def plot_data(dic, data_apod, data_den, k_thres):
     elif data_apod.ndim == 2:                           # 2D data set
         data_apod_real = data_apod[::2,:]   # remove interleaved imaginary part
         data_den_real = data_den[::2,:]
-        data_spc_real = data_spc[::2,:]
+        data_spc_real = data_apod_spc[::2,:]
         data_den_spc_real = data_den_spc[::2,:]
         nlev = 15
-        colormap = 'viridis'                            # color map
         # FID scale
         udic = ng.bruker.guess_udic(dic, data_apod_real)# universal dictionary
         x_scale_fid = ng.fileiobase.uc_from_udic(udic, dim=1).ms_scale()
@@ -304,45 +198,41 @@ def plot_data(dic, data_apod, data_den, k_thres):
         ax1.set_title('Noisy FID')
         ax1.set_xlabel('ms')
         ax1.set_ylabel('ms')
-        ax1.contour(x_scale_fid, y_scale_fid, data_apod_real.real, \
-            levels_fid, cmap=colormap)
+        ax1.contour(x_scale_fid, y_scale_fid, data_apod_real.real, levels_fid)
         ax2 = fig.add_subplot(222)
         ax2.set_title('Denoised FID, k = {:d}'.format(k_thres))
         ax2.set_xlabel('ms')
         ax2.set_ylabel('ms')
-        ax2.contour(x_scale_fid, y_scale_fid, data_den_real.real, \
-            levels_fid, cmap=colormap)
+        ax2.contour(x_scale_fid, y_scale_fid, data_den_real.real, levels_fid)
         ax3 = fig.add_subplot(223)
         ax3.set_title('Noisy SPC')
         ax3.set_xlabel('ppm')
         ax3.set_ylabel('ppm')
-        ax3.contour(x_scale_spc, y_scale_spc, data_spc_real.real, \
-            levels_spc, cmap=colormap)
+        ax3.contour(x_scale_spc, y_scale_spc, data_spc_real.real, levels_spc)
         ax3.invert_xaxis()
         ax3.invert_yaxis()
         ax4 = fig.add_subplot(224)
         ax4.set_title('Denoised SPC, k = {:d}'.format(k_thres))
         ax4.set_xlabel('ppm')
         ax4.set_ylabel('ppm')
-        ax4.contour(x_scale_spc, y_scale_spc, data_den_spc_real.real, \
-            levels_spc, cmap=colormap)
+        ax4.contour(
+            x_scale_spc, y_scale_spc, data_den_spc_real.real, levels_spc)
         ax4.invert_xaxis()
         ax4.invert_yaxis()
     fig.tight_layout()
     plt.show()
+    return data_den_spc
 
 #%%----------------------------------------------------------------------------
 ### MAIN FUNCTION
 ###----------------------------------------------------------------------------
-def denoise_io(data_dir, data_den_dir, k_thres='auto', max_err='auto'):
+def denoise_io(data_dir, k_thres='auto', max_err='auto'):
     """
     Import, denoise, plot and export data
     Usage:  denoise_io(data_dir)
             denoise_io(data_dir, k_thres=0, max_err=7.5)
     Input:  data_dir     directory of data to denoise (string)
-                         ex: c:/Users/nmr/29Si/1
-            data_den_dir directory of denoised data (string)
-                         ex: c:/Users/nmr/29Si/1001
+                         ex: c:/Users/nmr/29Si/1/pdata/1
             k_thres      if 0, allows automatic thresholding
                          if > 0 and <= min(row, col), manual threshold (integer)
             max_err      error level for automatic thresholding
@@ -351,17 +241,15 @@ def denoise_io(data_dir, data_den_dir, k_thres='auto', max_err='auto'):
     """
     try:
         # Import data and apply apodisation
-        dic, data, data_den_dir = import_data(data_dir, data_den_dir)
-        data_apod = apod(data)
+        dic, data = ng.bruker.read(data_dir)
+        data_apod = hng.preproc(dic, data)
         
-        # Denoise data
+        # Denoise data, Fourier transform, and plot
         data_den, k_thres = denoise(data_apod, k_thres, max_err)
-        
-        # Plot original and denoised data
-        plot_data(dic, data_apod, data_den, k_thres)
+        data_den = plot_data(dic, data_apod, data_den, k_thres)
         
         # Export data
-        export_data(dic, data_den, data_den_dir)
+        hng.export_data(dic, data_den, data_dir)
         
     except KeyError as err:                             # writing data
         print('Error: unable to write data. Missing key:', err)
@@ -384,24 +272,19 @@ if __name__ == '__main__':
         else:
             raise ValueError \
                 ('Please provide data directory as first argument')
-        # Directory for denoised data
-        if (len(sys.argv) >= 3):
-            data_den_dir = str(sys.argv[2])
-        else:
-            data_den_dir = None
         # Manual or authomatic threshold
-        if len(sys.argv) >= 4:
-            k_thres = int(sys.argv[3])
+        if len(sys.argv) >= 3:
+            k_thres = int(sys.argv[2])
         # Automatic threshold error level
-        if len(sys.argv) == 5:
-            max_err = float(sys.argv[4])
+        if len(sys.argv) >= 4:
+            max_err = float(sys.argv[3])
         # Maximum number of arguments
-        if len(sys.argv) > 5:
+        if len(sys.argv) >= 5:
             raise ValueError \
-                ('Supports only 4 arguments')
+                ('Supports only 3 arguments')
         
         # Import, denoise, plot and export data
-        denoise_io(data_dir, data_den_dir, k_thres, max_err)
+        denoise_io(data_dir, k_thres, max_err)
     
     except ValueError as err:                           # arguments
         print('Error:', err)

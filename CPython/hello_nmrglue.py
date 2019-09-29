@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import nmrglue as ng
 import numpy as np
 import sys
+import time
 
-def data_import():
+def import_data():
     # Import data
     if len(sys.argv) == 1:
         raise NotImplementedError(
@@ -18,7 +19,7 @@ def data_import():
     dic, data = ng.bruker.read(data_dir)
     return dic, data, data_dir
 
-def data_export(dic, data, data_dir):
+def export_data(dic, data, data_dir):
     # Write data
     # Data should have exatly the original processed size (bug #109)
     scaling = 8
@@ -54,8 +55,9 @@ def preproc(dic, data):
     # Preprocessing
     # Direct dimension processing
     data = ng.bruker.remove_digital_filter(dic, data)   # digital filtering
-    data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
-    if data.ndim == 2:                      # Indirect dimension processing
+    data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)     # apodization
+    # Indirect dimension processing
+    if data.ndim == 2:
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
         data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
@@ -65,7 +67,8 @@ def preproc(dic, data):
     return data
 
 def postproc(dic, data):
-    # Direct dimension processing
+    # Postprocessing
+    # Direct dimension
     data = ng.proc_base.zf_size(data, dic['procs']['SI'])   # zero-filling
     if data.ndim == 1:
         data[0] /= 2                                        # normalization
@@ -77,9 +80,12 @@ def postproc(dic, data):
     data = ng.proc_base.fft_norm(data)                      # FFT with norm
     data = ng.proc_base.rev(data)                           # revert spectrum
     print("Autophasing:")
+    t_0 = time.time()
     data = ng.proc_autophase.autops(data, 'acme')           # autophasing
+    t_1 = time.time()
+    print('Autophasing time:             {:8.2f} s\n'.format(t_1 - t_0))
     if data.ndim == 2:
-        # Indirect dimension processing
+        # Indirect dimension
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
         data = ng.proc_base.zf_size(data, dic['proc2s']['SI'])  # zero-filling
         data[:, 0] /= 2                                     # normalization
@@ -90,8 +96,6 @@ def postproc(dic, data):
             data = np.fft.fftshift(data, axes=-1)           # swap spectrum
         data = ng.proc_base.rev(data)                       # revert spectrum
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-    baseline = [0, data.shape[-1]-1]
-    data = ng.proc_bl.base(data, baseline)          # baseline correction
     return data
 
 def plotting(dic, data):
@@ -146,10 +150,10 @@ def plotting(dic, data):
 
 def main():
     try:
-        dic, data, data_dir = data_import()
+        dic, data, data_dir = import_data()
         data = preproc(dic, data)
         data = postproc(dic, data)
-        data_export(dic, data, data_dir)
+        export_data(dic, data, data_dir)
         plotting(dic, data)
     except NotImplementedError as err:
         print("Error:", err)
@@ -158,9 +162,8 @@ def main():
     except OSError as err:
         print("Error:", err)
     else:                                           # When no error occured
-        print("\nNMRglue was successfully tested:")
-        print("importation, digital filtering, fft, autophasing,")
-        print("baseline correction, and saving")
+        print("NMRglue was successfully tested:")
+        print("importation, digital filtering, fft, autophasing, and saving")
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly

@@ -71,10 +71,10 @@ def lib_svd(X, lib):
         else:                                           # prefer GPU
             lib = 'skcuda'
     if lib == 'scipy':                                  # use CPU
-        print('\n\t{:5} x {:5} points - Scipy - {:8s}' \
+        print('\t{:5} x {:5} points - Scipy - {:8s}' \
             .format(m, n, str(np.dtype(typ))))
     elif lib == 'skcuda':                               # use GPU
-        print('\n\t{:5} x {:5} points - skCuda - {:8s}' \
+        print('\t{:5} x {:5} points - skCuda - {:8s}' \
             .format(m, n, str(np.dtype(typ))))
     else:                                               # no library
         raise ImportError('Unknown SVD library')
@@ -115,12 +115,9 @@ def svd_scipy(X, typ):
             S           singular values (vector)
             Vt          transposed right unitary matrix (array)
     """
-    print('\tSVD in progress, please be patient.')
-    t_0 = time.time()
     X = X.astype(typ)
     U, S, Vt = sp_linalg.svd(X, full_matrices=False)
     t_1 = time.time()
-    print('Decomposition time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return U, S, Vt
 
 def svd_skcuda(X, typ):
@@ -134,17 +131,13 @@ def svd_skcuda(X, typ):
             S           singular values on CPU (vector)
             Vt_gpu      transposed right unitary matrix on GPU (array)
     """
-    print('\tSVD in progress. Please be patient.')
-    t_0 = time.time()
     X = X.astype(typ)
     X_gpu = gpuarray.to_gpu(X)                          # send data to gpu
-    U_gpu, S_gpu, Vt_gpu = cu_linalg.svd(X_gpu, jobu='S', jobvt='S', lib='cula')
-                                                    # small U and Vt matrices
+    U_gpu, S_gpu, Vt_gpu = cu_linalg.svd(
+        X_gpu, jobu='S', jobvt='S', lib='cula')     # small U and Vt matrices
     S = S_gpu.get()
     X_gpu.gpudata.free()                                # release gpu memory
     S_gpu.gpudata.free()
-    t_1 = time.time()
-    print('Decomposition time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return U_gpu, S, Vt_gpu
 
 def decomposition(X, lib, typ):
@@ -158,10 +151,14 @@ def decomposition(X, lib, typ):
             S           singular values (vector)
             Vt          transposed right unitary matrix (array)
     """
+    print('\tSVD in progress. Please be patient.')
+    t_0 = time.time()
     if lib == 'scipy':                                  # using SciPy
         U, S, Vt = svd_scipy(X, typ)
     elif lib == 'skcuda':                               # using scikit-cuda
         U, S, Vt = svd_skcuda(X, typ)
+    t_1 = time.time()
+    print('Decomposition time:           {:8.2f} s'.format(t_1 - t_0))
     return U, S, Vt
 
 #%%----------------------------------------------------------------------------
@@ -201,8 +198,7 @@ def thres_ind(S, m, n):                                 # Indicator function
     ind[-1] = np.nan
     k_ind = np.argmin(ind[:-1]) + 1                 # to compensate start at 0
     params_ind = (ev, re, ind, rev, sdf, sev)           # group parameters
-    print('IND thresholding: \t\t{:8d} values' \
-        .format(k_ind))
+    print('IND thresholding:          {:8d} values'.format(k_ind))
     return k_ind, params_ind
 
 def thres_sl(S, X, max_err):                            # Significant level
@@ -217,7 +213,11 @@ def thres_sl(S, X, max_err):                            # Significant level
     Output: k_sl        significant level SL (integer)
     """
     t_0 = time.time()
-    n, m = X.shape                                  # invert rows and col sizes
+    m, n = X.shape
+    if m < n:
+        raise ValueError(
+            '\nnumber of rows should be higher than number of colomns \
+            for thresholding')
     k_ind, params_ind = thres_ind(S, m, n)
     ev, re, ind, rev, sdf, sev = params_ind[:]
     t = np.zeros((n,6))
@@ -260,11 +260,11 @@ def thres_sl(S, X, max_err):                            # Significant level
     t[n-1, 5] = np.nan
     k_sl = np.argmin((t[:n-1,5]) < max_err)         # to compensate start at 0
     t_1 = time.time()
-    print('SL thresholding at {:4.1f} %: \t{:8d} values' \
+    print('SL thresholding at {:4.1f} %: {:8d} values' \
         .format(max_err, k_sl))
     if k_sl < 0:
         raise ValueError('No signal found after thresholding')
-    print('Thresholding time:\t\t{:8.2f} s'.format(t_1 - t_0))
+    print('Thresholding time:            {:8.2f} s'.format(t_1 - t_0))
     return k_sl
 
 def threshold(S, X, k_thres, max_err):
@@ -300,11 +300,8 @@ def lowrank_scipy(U, S, Vt, k_thres, typ):
             typ         data type (string)
     Output: Xk          recovered matrix
     """
-    t_0 = time.time()
     Smat = sp_linalg.diagsvd(S[:k_thres], k_thres, k_thres).astype(typ)
     Xk = np.dot (U[:,:k_thres], np.dot (Smat, Vt[:k_thres,:]))
-    t_1 = time.time()
-    print('Resconstruction time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return Xk
 
 def lowrank_skcuda(U_gpu, S, Vt_gpu, k_thres, typ):
@@ -318,7 +315,6 @@ def lowrank_skcuda(U_gpu, S, Vt_gpu, k_thres, typ):
             typ         data type (string)
     Output: Xk          recovered matrix
     """
-    t_0 = time.time()
     S_gpu = gpuarray.to_gpu(S)                          # send data to gpu
     S_gpu = S_gpu.astype(typ)
     Xk_gpu = (cu_linalg.dot(U_gpu[:,:k_thres], \
@@ -328,8 +324,6 @@ def lowrank_skcuda(U_gpu, S, Vt_gpu, k_thres, typ):
     U_gpu.gpudata.free()
     S_gpu.gpudata.free()
     Vt_gpu.gpudata.free()
-    t_1 = time.time()
-    print('Resconstruction time:\t\t{:8.2f} s'.format(t_1 - t_0))
     return Xk
 
 def lowrank(U, S, Vt, k_thres, lib, typ):
@@ -344,10 +338,13 @@ def lowrank(U, S, Vt, k_thres, lib, typ):
             typ         data type (string)
     Output: Xk          recovered matrix
     """
+    t_0 = time.time()
     if lib == 'scipy':                                  # using SciPy
         Xk = lowrank_scipy(U, S, Vt, k_thres, typ)
     elif lib == 'skcuda':                               # using scikit-cuda
         Xk = lowrank_skcuda(U, S, Vt, k_thres, typ)
+    t_1 = time.time()
+    print('Resconstruction time:         {:8.2f} s\n'.format(t_1 - t_0))
     return Xk
 
 #%%----------------------------------------------------------------------------
@@ -420,13 +417,15 @@ if __name__ == '__main__':
             X = np.arange(m*n).reshape(m, n).astype(typ)
             try:                        # using CPU
                 t_cpu_0 = time.time()
-                Xk, k_thres = svd_auto(X, k_thres=n, lib='scipy', disp_err=True)
+                Xk, k_thres = svd_auto(
+                    X, k_thres=n, lib='scipy', disp_err=True)
                 t_cpu = time.time() - t_cpu_0
             except TypeError:           # avoid insignificant value
                 t_cpu = float('nan')
             try:                        # using GPU
                 t_gpu_0 = time.time()
-                Xk, k_thres = svd_auto(X, k_thres=n, lib='skcuda', disp_err=True)
+                Xk, k_thres = svd_auto(
+                    X, k_thres=n, lib='skcuda', disp_err=True)
                 t_gpu = time.time() - t_gpu_0
             except TypeError:           # avoid insignificant value
                 t_gpu = float('nan')

@@ -2,49 +2,34 @@
 # -*- coding: utf-8 -*-
 
 from CPython_init import CPYTHON_BIN, CPYTHON_LIB
-import os.path
-import subprocess
+from subprocess import Popen, PIPE
+
+FILE = 'denoise_nmr.py'
+CPYTHON_FILE = CPYTHON_LIB + FILE
 
 def fullpath(dataset):
-    dat=dataset[:]      # copy the original array
-    if len(dat)==5:     # for topspin 2
+    dat=dataset[:]          # copy the original array
+    if len(dat)==5:         # for topspin 2
         dat[3]="%s/data/%s/nmr" % (dat[3], dat[4])
-    fulldata="%s/%s/%s" % (dat[3], dat[0], dat[1])
-    fulldata_proc="%s/%s/%s/pdata/%s" % (dat[3], dat[0], dat[1], dat[2])
-    return fulldata, fulldata_proc
-
-def dimension(fulldata):
-    if os.path.exists(fulldata + '/acqu2s'):                    # check 2D file
-        dim = 2
-    else:
-        dim = 1
-    return dim
-
-print('\n\n\n---------------------------------------------')    # line jump
-print('svd.py started')
+    fulldata="%s/%s/%s/pdata/%s" % (dat[3], dat[0], dat[1], dat[2])
+    return fulldata
 
 # Get raw data
-fulldata, fulldata_proc = fullpath(CURDATA())
-dim = dimension(fulldata)
-print('\nOriginal data %s' %fulldata_proc)
+dataset = CURDATA()
+fulldata = fullpath(dataset)
 
-# Analogic conversion
-# Induces negative components for each line
-XCMD('convdta')
-fulldata_new, fulldata_new_proc = fullpath(CURDATA())
+# Copy data
+dataset_new = dataset[:]    # copy the original array
+dataset_new[1]= INPUT_DIALOG(
+    'Copy dataset', '', ['new expno ='], [str(int(dataset[1])+100)])[0]
+XCMD(str('wrpa ' + dataset_new[1]))
+RE(dataset_new)
+
+# Verification
+fulldata_new = fullpath(CURDATA())
 if fulldata_new == fulldata:
-    ERRMSG('Analogic conversion was not performed, SVD aborted.', 'SVD')
+    ERRMSG('Copy was not performed, hello_nmrglue aborted.', 'hello_nmrglue')
     EXIT()
-
-# For phasing under python
-PUTPAR('1 WDW', 'SINE')
-PUTPAR('1 SSB', '2')
-if dim == 1:
-    EFP()
-else:
-    PUTPAR('2 WDW', 'SINE')
-    PUTPAR('2 SSB', '2')
-    XFB()
 
 # SVD options
 options = INPUT_DIALOG(
@@ -53,20 +38,14 @@ options = INPUT_DIALOG(
     'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
 
 # Call to standard python
-FILE = 'denoise_nmr.py'
-CPYTHON_FILE = CPYTHON_LIB + FILE
-ARGUMENTS = fulldata_new_proc +' '+ fulldata_new \
-    +' '+ options[0] +' '+ options[1]
+COMMAND_LINE = " ".join(str(elm) for elm in [
+    CPYTHON_BIN, CPYTHON_FILE, fulldata_new, options[0], options[1]])
 SHOW_STATUS('SVD in progress, please be patient.')
-subprocess.call(CPYTHON_BIN +' '+ CPYTHON_FILE +' '+ ARGUMENTS)
+p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+output, err = p.communicate()
 
-# Read processed data
-PUTPAR('1 WDW', 'no')
-if dim == 1:
-    FP()
-else:
-    PUTPAR('2 WDW', 'no')
-    XFB()
-
-print('\nsvd.py finished')
-print('---------------------------------------------')          # line jump
+# Display result
+RE(dataset_new)
+VIEWTEXT(
+    title='svd', header='Output of svd script',
+    text=output+'\n'+err, modal=0)

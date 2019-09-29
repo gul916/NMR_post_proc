@@ -34,7 +34,7 @@ if fulldata_new == fulldata:
 # Call to standard python
 COMMAND_LINE = " ".join(
     str(elm) for elm in [CPYTHON_BIN, CPYTHON_FILE, fulldata_new])
-SHOW_STATUS('hello_nmrglue in progress')
+SHOW_STATUS('hello_nmrglue in progress. Please be patient.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 
