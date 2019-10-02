@@ -33,7 +33,7 @@ std = 0.3
 # 1st frequency
 amp1 = 1                        # amplitude
 nu1 = 1750                      # frequency in Hz
-t21 = 50e-3                     # true T2 relaxation time
+t21 = 30e-3                     # true T2 relaxation time
 t21star = 1e-3                  # apparent T2 relaxation time
 sigma1 = np.sqrt(2*np.log(2))*t21star       # for Gaussian shape
 gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -41,7 +41,7 @@ gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
 # 2nd frequency
 amp2 = 1                        # amplitude
 nu2 = -3000                     # frequency in Hz
-t22 = 10e-3                     # true T2 relaxation time
+t22 = 100e-3                     # true T2 relaxation time
 t22star = 1e-3                  # apparent T2 relaxation time
 sigma2 = np.sqrt(2*np.log(2))*t22star;      # for Gaussian shape
 gl2 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -58,8 +58,8 @@ acquiT = (td2 - 1) * dw2        # total acquisition duration, starts at 0
 nbPtHalfEcho = int(halfEcho / dw2)
 nbPtSignal = nbPtHalfEcho * nbHalfEcho
 dureeSignal = (nbPtSignal -1) * dw2     # signal duration, starts at 0
-missingPts = td2 - nbPtSignal   # Number of points after last echo
-nbPtDeadTime = int(de / dw2)    # Number of point during dead time
+nbPtLast = td2 - nbPtSignal     # Number of points after last echo
+nbPtShift = int(de / dw2)       # Number of point during dead time
 
 if (gl1 < 0) or (gl1 > 1):
     raise ValueError('gl1 must be between 0 and 1')
@@ -94,18 +94,18 @@ def signal_generation():
             amp2 * np.exp(1j*2*np.pi*nu2*(timei-tzero))
             * ((1-gl2)*np.exp(-abs(timei-tzero)/t22star)
             + (gl2)*np.exp(-(timei-tzero)**2/(2*sigma2**2)))
-            * np.exp(-(timei)/t21))
+            * np.exp(-(timei)/t22))
         yi = yi1 + yi2
         Aref = np.concatenate((Aref, yi))
         desc = not(desc)
     
     # Final points
-    end = np.zeros(missingPts, dtype=np.complex)
+    end = np.zeros(nbPtLast, dtype=np.complex)
     Aref = np.concatenate((Aref,end))
 
     # Suppression of points during dead time 
-    end = np.zeros(nbPtDeadTime, dtype=np.complex)
-    Adead = np.concatenate((Aref[nbPtDeadTime:],end))
+    end = np.zeros(nbPtShift, dtype=np.complex)
+    Adead = np.concatenate((Aref[nbPtShift:],end))
 
     # Adding noise
     noise = (
@@ -113,78 +113,74 @@ def signal_generation():
         + 1j*np.random.normal(mean, std, td2))
     Anoisy = Adead + noise
     
-    # Convert to a class object containing all parameters
-    Aref = postproc.Signal(Aref, dw, de, firstDec, nbEcho, fullEcho)
-    Adead = postproc.Signal(Adead, dw, de, firstDec, nbEcho, fullEcho)
-    Anoisy = postproc.Signal(Anoisy, dw, de, firstDec, nbEcho, fullEcho)
-    
-    return Aref, Adead, Anoisy
+    # Convert to a dictionary containing all parameters
+    dic = postproc.CPMG_pseudo_dic(Aref, dw2)
+    dic = postproc.CPMG_dic(
+        dic, Aref, fullEcho, nbEcho, firstDec, nbPtShift)
+    return dic, Aref, Adead, Anoisy
 
-def plot_function(Aref, Adead, Anoisy):
-    # keep only a half echo for ArefSPC
+def plot_function(dic, Aref, Adead, Anoisy):
+    # keep only a half echo for ArefSPC and normalization
     if firstDec == True:
-        ArefSPC = postproc.Signal(
-            Aref.data[:nbPtHalfEcho], Aref.dw, Aref.de,
-            Aref.firstDec, 0, Aref.fullEcho)
+        ArefSPC = Aref[:nbPtHalfEcho] * nbHalfEcho
     else:
-        ArefSPC = postproc.Signal(
-            Aref.data[nbPtHalfEcho:2*nbPtHalfEcho], Aref.dw, Aref.de,
-            Aref.firstDec, 0, Aref.fullEcho)
-
+        ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
     # Zero-filling and Fourier transform
-    ArefSPC = postproc.spc(ArefSPC)
-    AnoisySPC = postproc.spc(Anoisy)
-
+    ArefSPC = postproc.postproc_data(dic, ArefSPC, False)
+    AnoisySPC = postproc.postproc_data(dic, Anoisy, False)
+    ms_scale = dic['CPMG']['ms_scale']
+    Hz_scale = dic['CPMG']['Hz_scale']
+    
     # Plotting
     plt.ion()                           # interactive mode on
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal synthesis', fontsize=16)
-    vert_scale = abs(max(Aref.data.real)) * 1.1
-
+    vert_scale = abs(max(Aref.real)) * 1.1
+    
     # Reference FID display
     ax1 = fig1.add_subplot(411)
     ax1.set_title('Reference FID')
-    ax1.plot(Aref.ms_scale, Aref.data.real)
-    ax1.plot(Aref.ms_scale, Aref.data.imag)
-    ax1.set_xlim([-Aref.halfEcho * 1e3, (Aref.acquiT+Aref.halfEcho)*1e3])
+    ax1.plot(ms_scale, Aref.real)
+    ax1.plot(ms_scale, Aref.imag)
+    ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
-
+    
     # FID display after dead time suppression
     ax2 = fig1.add_subplot(412)
     ax2.set_title('FID after dead time suppression')
-    ax2.plot(Adead.ms_scale, Adead.data.real)
-    ax2.plot(Adead.ms_scale, Adead.data.imag)
-    ax2.set_xlim([-Adead.halfEcho * 1e3, (Adead.acquiT+Aref.halfEcho)*1e3])
+    ax2.plot(ms_scale, Adead.real)
+    ax2.plot(ms_scale, Adead.imag)
+    ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
-
+    
     # FID display after dead time suppression and noise addition
     ax3 = fig1.add_subplot(413)
     ax3.set_title('FID after addition of noise')
-    ax3.plot(Anoisy.ms_scale, Anoisy.data.real)
-    ax3.plot(Anoisy.ms_scale, Anoisy.data.imag)
-    ax3.set_xlim([-Anoisy.halfEcho * 1e3, (Anoisy.acquiT+Anoisy.halfEcho)*1e3])
+    ax3.plot(ms_scale, Anoisy.real)
+    ax3.plot(ms_scale, Anoisy.imag)
+    ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax3.set_ylim([-vert_scale, vert_scale])
-
+    
     # Spectra display
     ax4 = fig1.add_subplot(414)
     ax4.set_title('Noisy SPC and reference SPC')
-    ax4.plot(AnoisySPC.ppm_scale, AnoisySPC.data.real)
-    ax4.plot(ArefSPC.ppm_scale, ArefSPC.data.real)
+    ax4.plot(Hz_scale, AnoisySPC[::-1].real)
+    ax4.plot(Hz_scale, ArefSPC[::-1].real)
     ax4.invert_xaxis()
-
+    
     # Avoid superpositions on figure
     fig1.tight_layout(rect=(0,0,1,0.95))
     fig1.show()                 # Display figure
     
 def main():
-    Aref, Adead, Anoisy = signal_generation()
-    plot_function(Aref, Adead, Anoisy)
-    return Anoisy
+    dic, Aref, Adead, Anoisy = signal_generation()
+    plot_function(dic, Aref, Adead, Anoisy)
+    return dic, Anoisy
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    _ = main()
+    dic, Anoisy = main()
     input('\nPress enter key to exit') # wait before closing figure
