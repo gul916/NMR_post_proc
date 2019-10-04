@@ -1,7 +1,7 @@
 # Jython for Topspin
 # -*- coding: utf-8 -*-
 
-from CPython_init import CPYTHON_BIN, CPYTHON_LIB
+from CPython_init import CPYTHON_BIN, CPYTHON_LIB, get_os_version
 from subprocess import Popen, PIPE
 
 FILE = 'snr.py'
@@ -28,9 +28,11 @@ nois_lim_1 = GETPAR2('NOISF1')
 nois_lim_2 = GETPAR2('NOISF2')
 
 # Call to standard python
-COMMAND_LINE = " ".join(str(elm) for elm in [
+COMMAND_LINE = [
     CPYTHON_BIN, CPYTHON_FILE, fulldata,
-    sig_lim_1, sig_lim_2, nois_lim_1, nois_lim_2])
+    sig_lim_1, sig_lim_2, nois_lim_1, nois_lim_2]
+if get_os_version().startswith('windows'):
+    COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
 SHOW_STATUS('snr in progress')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()

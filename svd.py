@@ -1,7 +1,7 @@
 # Jython for Topspin
 # -*- coding: utf-8 -*-
 
-from CPython_init import CPYTHON_BIN, CPYTHON_LIB
+from CPython_init import CPYTHON_BIN, CPYTHON_LIB, get_os_version
 from subprocess import Popen, PIPE
 
 FILE = 'denoise_nmr.py'
@@ -38,8 +38,10 @@ options = INPUT_DIALOG(
     'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
 
 # Call to standard python
-COMMAND_LINE = " ".join(str(elm) for elm in [
-    CPYTHON_BIN, CPYTHON_FILE, fulldata_new, options[0], options[1]])
+COMMAND_LINE = [
+    CPYTHON_BIN, CPYTHON_FILE, fulldata_new, options[0], options[1]]
+if get_os_version().startswith('windows'):
+    COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
 SHOW_STATUS('SVD in progress, please be patient.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()

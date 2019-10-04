@@ -70,7 +70,7 @@ def main():
             raise NotImplementedError("There should be only one argument.")
         
         dic, data = postproc.import_data(data_dir)
-        data = postproc.preproc_data(dic, data)
+        data = postproc.preproc_data(data)
         data = postproc.postproc_data(dic, data)
         postproc.export_data(dic, data, data_dir)
         plotting(dic, data)

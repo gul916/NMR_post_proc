@@ -233,7 +233,7 @@ def denoise_io(data_dir, k_thres='auto', max_err='auto'):
     try:
         # Import data and apply apodisation
         dic, data = postproc.import_data(data_dir)
-        data_apod = postproc.preproc_data(dic, data)
+        data_apod = postproc.preproc_data(data)
         
         # Denoise data, Fourier transform, and plot
         data_den, k_thres = denoise(data_apod, k_thres, max_err)
