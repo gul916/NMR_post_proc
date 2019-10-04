@@ -16,9 +16,9 @@ import postproc
 ###----------------------------------------------------------------------------
 
 # Asked to the user
-firstDec = False
+firstDec = True
 fullEcho = 10e-3
-nbEcho = 40
+nbEcho = 39
 
 # From Topspin interface
 td = 8000                       # nb of real points + nb of imag points
@@ -175,7 +175,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
-    plot_function(dic, Aref, Adead, Anoisy)
+#    plot_function(dic, Aref, Adead, Anoisy)
     return dic, Anoisy
 
 #%%----------------------------------------------------------------------------
