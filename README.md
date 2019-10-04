@@ -15,22 +15,12 @@ Two kinds of files are present in this repository :
 - Install nmrglue: pip install nmrglue-0.7-py2.py3-none-any.whl
 
 
-### Installation under windows
+### Installation
 - Download NMR_post_proc.zip.
 - Extract NMR_post_proc.zip into the desired directory.
-- Modify CPython_init_windows.py according to Anaconda and NMR_post_proc directories.
-- Copy CPython_init_windows.py as CPython_init.py and move it into
-'C:\Bruker\TopSpin3.6.1\exp\stan\nmr\py\user'.
-- In Topspin, click on Manage tab and preferences button, locate Directories section, "Manage source directories for edpul, edau, etc." and click on "Change". Select "Python Programs", and add NMR_post_proc directory.
-- Restart Topspin.
-
-
-### Installation under linux
-- Download NMR_post_proc.zip.
-- Extract NMR_post_proc.zip into the desired directory.
-- Modify CPython_init_linux.py according to Anaconda and NMR_post_proc directories.
-- Copy CPython_init_linux.py as CPython_init.py and move it into
-/opt/Bruker/TopSpin3.6.1/exp/stan/nmr/py/user.
+- Modify CPython_init.py according to Anaconda and NMR_post_proc directories.
+- Under Windows, copy CPython_init.py into 'C:\Bruker\TopSpin3.6.1\exp\stan\nmr\py\user'.
+- Under Linux, copy CPython_init.py into '/opt/Bruker/TopSpin3.6.1/exp/stan/nmr/py/user'.
 - In Topspin, click on Manage tab and preferences button, locate Directories section, "Manage source directories for edpul, edau, etc." and click on "Change". Select "Python Programs", and add NMR_post_proc directory.
 - Restart Topspin.
 

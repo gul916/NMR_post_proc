@@ -11,8 +11,7 @@ import numpy as np
 import time
 import warnings
 
-def CPMG_pseudo_dic(data, dw2):
-    td2 = data.size                                     # complex points TD / 2
+def CPMG_pseudo_dic(td2, dw2):
     dic = {}
     dic['acqus'] = {}
     dic['acqus']['SW_h'] = 1 / dw2
@@ -20,8 +19,7 @@ def CPMG_pseudo_dic(data, dw2):
     dic['procs']['SI'] = ng.proc_base.largest_power_of_2(td2*4)
     return dic
 
-def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
-    td2 = data.size                                     # complex points TD / 2
+def CPMG_dic(dic, td2, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     si = dic['procs']['SI']                             # complex points SI
     dw2 = 1 / dic['acqus']['SW_h']                  # complex dwell time DW * 2
     acquiT = dw2 * (td2-1)                              # acquisition time
@@ -110,14 +108,20 @@ def export_data(dic, data, data_dir):
 #%%----------------------------------------------------------------------------
 ### PROCESSING
 ###----------------------------------------------------------------------------
-def preproc_data(data):
+def preproc_data(data, apod='cos', lb=0.0):
     # Preprocessing
+    if apod == 'cos':
+        apod_func = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)
+    elif apod == 'exp':
+        apod_func = ng.proc_base.em(data, lb)
+    else:
+        raise NotImplementedError('Apodization function not implemented')
     # Direct dimension
-    data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0)     # apodization
+    data = apod_func                                        # apodization
     # Indirect dimension processing
     if data.ndim == 2:
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
-        data = ng.proc_base.sp(data, off=0.5, end=1.0, pow=1.0) # apodization
+        data = apod_func                                    # apodization
         data = ng.proc_base.tp_hyper(data)          # hypercomplex transpose
     elif data.ndim > 2:
         raise NotImplementedError(

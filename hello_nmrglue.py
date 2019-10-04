@@ -1,7 +1,7 @@
 # Jython for Topspin
 # -*- coding: utf-8 -*-
 
-from CPython_init import CPYTHON_BIN, CPYTHON_LIB
+from CPython_init import CPYTHON_BIN, CPYTHON_LIB, get_os_version
 from subprocess import Popen, PIPE
 
 FILE = 'hello_nmrglue.py'
@@ -32,8 +32,9 @@ if fulldata_new == fulldata:
     EXIT()
 
 # Call to standard python
-COMMAND_LINE = " ".join(
-    str(elm) for elm in [CPYTHON_BIN, CPYTHON_FILE, fulldata_new])
+COMMAND_LINE = [CPYTHON_BIN, CPYTHON_FILE, fulldata_new]
+if get_os_version().startswith('windows'):
+    COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
 SHOW_STATUS('hello_nmrglue in progress. Please be patient.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()

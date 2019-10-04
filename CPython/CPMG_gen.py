@@ -16,12 +16,12 @@ import postproc
 ###----------------------------------------------------------------------------
 
 # Asked to the user
-firstDec = True
+firstDec = False
 fullEcho = 10e-3
-nbEcho = 4
+nbEcho = 40
 
 # From Topspin interface
-td = 1000                       # nb of real points + nb of imag points
+td = 8000                       # nb of real points + nb of imag points
 dw = 50e-6                      # dwell time between two points
 de = 100e-6                     # dead time before signal acquisition
 #de = 0
@@ -33,7 +33,7 @@ std = 0.3
 # 1st frequency
 amp1 = 1                        # amplitude
 nu1 = 1750                      # frequency in Hz
-t21 = 30e-3                     # true T2 relaxation time
+t21 = 100e-3                     # true T2 relaxation time
 t21star = 1e-3                  # apparent T2 relaxation time
 sigma1 = np.sqrt(2*np.log(2))*t21star       # for Gaussian shape
 gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -41,7 +41,7 @@ gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
 # 2nd frequency
 amp2 = 1                        # amplitude
 nu2 = -3000                     # frequency in Hz
-t22 = 100e-3                     # true T2 relaxation time
+t22 = 30e-3                     # true T2 relaxation time
 t22star = 1e-3                  # apparent T2 relaxation time
 sigma2 = np.sqrt(2*np.log(2))*t22star;      # for Gaussian shape
 gl2 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -72,6 +72,11 @@ if (gl2 < 0) or (gl2 > 1):
 def signal_generation():
     desc = firstDec
     Aref = np.array([])
+
+    # Store parameters intoa dictionary
+    dic = postproc.CPMG_pseudo_dic(td2, dw2)
+    dic = postproc.CPMG_dic(
+        dic, td2, fullEcho, nbEcho, firstDec, nbPtShift)
 
     # tracé de la courbe par les demi echos
     for i in range (0, nbHalfEcho):
@@ -113,18 +118,14 @@ def signal_generation():
         + 1j*np.random.normal(mean, std, td2))
     Anoisy = Adead + noise
     
-    # Convert to a dictionary containing all parameters
-    dic = postproc.CPMG_pseudo_dic(Aref, dw2)
-    dic = postproc.CPMG_dic(
-        dic, Aref, fullEcho, nbEcho, firstDec, nbPtShift)
     return dic, Aref, Adead, Anoisy
 
 def plot_function(dic, Aref, Adead, Anoisy):
     # keep only a half echo for ArefSPC and normalization
     if firstDec == True:
-        ArefSPC = Aref[:nbPtHalfEcho] * nbHalfEcho
+        ArefSPC = Aref[:nbPtHalfEcho] * nbEcho
     else:
-        ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho] * nbHalfEcho
+        ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho] * nbEcho
     # Zero-filling and Fourier transform
     ArefSPC = postproc.postproc_data(dic, ArefSPC, False)
     AnoisySPC = postproc.postproc_data(dic, Anoisy, False)
@@ -135,13 +136,13 @@ def plot_function(dic, Aref, Adead, Anoisy):
     plt.ion()                           # interactive mode on
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal synthesis', fontsize=16)
-    vert_scale = abs(max(Aref.real)) * 1.1
+    vert_scale = max(abs(Aref)) * 1.1
     
     # Reference FID display
     ax1 = fig1.add_subplot(411)
     ax1.set_title('Reference FID')
     ax1.plot(ms_scale, Aref.real)
-    ax1.plot(ms_scale, Aref.imag)
+#    ax1.plot(ms_scale, Aref.imag)
     ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
     
@@ -149,7 +150,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax2 = fig1.add_subplot(412)
     ax2.set_title('FID after dead time suppression')
     ax2.plot(ms_scale, Adead.real)
-    ax2.plot(ms_scale, Adead.imag)
+#    ax2.plot(ms_scale, Adead.imag)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
     
@@ -157,15 +158,15 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax3 = fig1.add_subplot(413)
     ax3.set_title('FID after addition of noise')
     ax3.plot(ms_scale, Anoisy.real)
-    ax3.plot(ms_scale, Anoisy.imag)
+#    ax3.plot(ms_scale, Anoisy.imag)
     ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax3.set_ylim([-vert_scale, vert_scale])
     
     # Spectra display
     ax4 = fig1.add_subplot(414)
     ax4.set_title('Noisy SPC and reference SPC')
-    ax4.plot(Hz_scale, AnoisySPC[::-1].real)
-    ax4.plot(Hz_scale, ArefSPC[::-1].real)
+    ax4.plot(Hz_scale, AnoisySPC.real)
+    ax4.plot(Hz_scale, ArefSPC.real)
     ax4.invert_xaxis()
     
     # Avoid superpositions on figure
