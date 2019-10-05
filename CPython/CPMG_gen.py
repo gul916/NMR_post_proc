@@ -18,10 +18,10 @@ import postproc
 # Asked to the user
 firstDec = True
 fullEcho = 10e-3
-nbEcho = 39
+nbEcho = 19
 
 # From Topspin interface
-td = 8000                       # nb of real points + nb of imag points
+td = 4000                       # nb of real points + nb of imag points
 dw = 50e-6                      # dwell time between two points
 de = 100e-6                     # dead time before signal acquisition
 #de = 0
@@ -142,7 +142,6 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax1 = fig1.add_subplot(411)
     ax1.set_title('Reference FID')
     ax1.plot(ms_scale, Aref.real)
-#    ax1.plot(ms_scale, Aref.imag)
     ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
     
@@ -150,7 +149,6 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax2 = fig1.add_subplot(412)
     ax2.set_title('FID after dead time suppression')
     ax2.plot(ms_scale, Adead.real)
-#    ax2.plot(ms_scale, Adead.imag)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
     
@@ -158,7 +156,6 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax3 = fig1.add_subplot(413)
     ax3.set_title('FID after addition of noise')
     ax3.plot(ms_scale, Anoisy.real)
-#    ax3.plot(ms_scale, Anoisy.imag)
     ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax3.set_ylim([-vert_scale, vert_scale])
     
@@ -168,6 +165,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     ax4.plot(Hz_scale, AnoisySPC.real)
     ax4.plot(Hz_scale, ArefSPC.real)
     ax4.invert_xaxis()
+    ax4.set_xlabel('Frequency (Hz)')
     
     # Avoid superpositions on figure
     fig1.tight_layout(rect=(0,0,1,0.95))
@@ -176,12 +174,12 @@ def plot_function(dic, Aref, Adead, Anoisy):
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
 #    plot_function(dic, Aref, Adead, Anoisy)
-    return dic, Anoisy
+    return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    dic, Anoisy = main()
+    dic, Aref, Anoisy = main()
     input('\nPress enter key to exit') # wait before closing figure

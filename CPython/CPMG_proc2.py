@@ -18,13 +18,13 @@ import postproc
 
 def data_import():
     if len(sys.argv) == 1:
-        dic, FIDraw = CPMG_gen.main()
+        dic, FIDref, FIDraw = CPMG_gen.main()
     else:
         raise NotImplementedError('Additional arguments are not yet supported')
-    return dic, FIDraw
+    return dic, FIDref, FIDraw
 
 def shift_FID(dic, data):
-    ndata = data[:]                                     # avoid data corruption
+    ndata = data[:]                                 # avoid data corruption
     nbPtShift = dic['CPMG']['nbPtShift']
     if nbPtShift < 0:                                       # left shift
         ndata = ng.proc_base.ls(ndata, nbPtShift)
@@ -32,20 +32,38 @@ def shift_FID(dic, data):
         ndata = ng.proc_base.rs(ndata, nbPtShift)
     return ndata
 
-def echo_apod(dic, data):
-    ndata = data[:dic['CPMG']['nbPtSignal']]            # remove useless points
+def echo_apod(dic, data, method='cos'):
+    ndata = data[:dic['CPMG']['nbPtSignal']]        # discard useless points
     desc = dic['CPMG']['firstDec']
-    # apodization of each half echo
-    for i in range(dic['CPMG']['nbHalfEcho']):
-        ptHalfEcho = slice(
-            i*dic['CPMG']['nbPtHalfEcho'], (i+1)*dic['CPMG']['nbPtHalfEcho'])
-        ndata[ptHalfEcho] = ng.proc_base.sp(
-            ndata[ptHalfEcho], off=0, end=0.5, pow=1.0, rev=desc)
-        desc = not(desc)
-    return ndata
+    if method == 'cos':
+        dic['CPMG']['apodEcho'] = 'cos'
+        apod = np.ones(dic['CPMG']['nbPtSignal']+1) # one additional point
+        for i in range(dic['CPMG']['nbHalfEcho']):  # each half echo
+            ptHalfEcho = slice(
+                i*dic['CPMG']['nbPtHalfEcho'],
+                (i+1)*dic['CPMG']['nbPtHalfEcho']+1)
+            apod[ptHalfEcho] = ng.proc_base.sp(
+                apod[ptHalfEcho], off=0.5, end=1, pow=1.0, rev=(not desc))
+            desc = not(desc)
+        apod = apod[:-1]            # discard last point used for calculation
+    elif method == 'exp':
+        T2 = dic['CPMG']['halfEcho']                        # in seconds
+        lb = (1 / (np.pi * T2))                             # in Hz
+        dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(int(lb)))
+        lb *= (dic['CPMG']['DW2'])                          # in points
+        apod = np.ones(dic['CPMG']['nbPtSignal'])
+        for i in range(dic['CPMG']['nbHalfEcho']):  # each half echo
+            ptHalfEcho = slice(
+                i*dic['CPMG']['nbPtHalfEcho'],
+                (i+1)*dic['CPMG']['nbPtHalfEcho'])
+            apod[ptHalfEcho] = ng.proc_base.em(
+                apod[ptHalfEcho], lb, rev=(not desc))
+            desc = not(desc)
+    ndata = ndata * apod
+    return dic, ndata
 
 def findMaxEcho(dic, data):
-    ndata = data[:]                                     # avoid data corruption
+    ndata = data[:]                                 # avoid data corruption
     nbHalfEcho = dic['CPMG']['nbHalfEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     ms_scale = dic['CPMG']['ms_scale']
@@ -79,27 +97,35 @@ def findT2(timeEcho, maxEcho):
     return result
 
 def global_apod(dic, data):
-    ndata = data[:]                                     # avoid data corruption
+    ndata = data[:]                                 # avoid data corruption
     timeEcho, maxEcho = findMaxEcho(dic, ndata)
     fitEcho = findT2(timeEcho, maxEcho)
     T2 = fitEcho[0][1]                                      # in milliseconds
-    maxSignal = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
+    if 3*T2 > 1e3*dic['CPMG']['dureeSignal']:
+        maxSignal = dic['CPMG']['nbPtSignal']
+        T2 = min(T2, 1e3*dic['CPMG']['dureeSignal'])
+    else:
+        maxSignal = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
     lb = (1e3 / (np.pi * T2))                               # in Hz
+    dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(int(lb)))
     lb *= (dic['CPMG']['DW2'])                              # in points
-    ndata = ng.proc_base.em(ndata[:maxSignal], lb)
+    apod = np.ones(maxSignal)
+    apod = ng.proc_base.em(apod, lb)
+    ndata = ndata[:maxSignal] * apod                # discard useless points
     dic['CPMG']['fitEcho'] = fitEcho
     dic['CPMG']['maxEcho'] = maxEcho
     dic['CPMG']['timeEcho'] = timeEcho
     return dic, ndata
 
 def trunc(dic, data):
-    ndata = data[:]                                        # avoid data corruption
+    ndata = data[:]                                 # avoid data corruption
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     if dic['CPMG']['firstDec'] == True:
         ndata = ndata[:nbPtHalfEcho]
     else:
         ndata = ndata[nbPtHalfEcho:2*nbPtHalfEcho]
     return ndata
+
 #%%----------------------------------------------------------------------------
 ### Plotting
 ###----------------------------------------------------------------------------
@@ -113,13 +139,14 @@ def FID_figure(dic, A, B, C, D, k_thres):
     fig1.suptitle('CPMG NMR signal processing - FID', fontsize=16)
     
     ax1_1 = fig1.add_subplot(411)
-    ax1_1.set_title('Shifted FID')
+    ax1_1.set_title('Raw FID')
     ax1_1.plot(ms_scale, A.real)
     ax1_1.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_1.set_ylim([-vert_scale_FID, vert_scale_FID])
     
     ax1_2 = fig1.add_subplot(412)
-    ax1_2.set_title('Echo + global apodised FID')
+    ax1_2.set_title('Apodized FID, {:s} and {:s}'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull']))
     ax1_2.plot(ms_scale[:B.size], B.real)
     ax1_2.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_2.set_ylim([-vert_scale_FID, vert_scale_FID])
@@ -132,11 +159,12 @@ def FID_figure(dic, A, B, C, D, k_thres):
     
     ax1_4 = fig1.add_subplot(414)
     ax1_4.set_title('Denoised and truncated FID, k = {:d}'.format(k_thres))
+    ax1_4.set_xlabel('Time (ms)')
     ax1_4.plot(ms_scale[:D.size], D.real)
     ax1_4.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_4.set_ylim([-vert_scale_FID, vert_scale_FID])
     
-    fig1.tight_layout(rect=(0,0,1,0.95))    # Avoid superpositions
+    fig1.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
     fig1.show()
 
 def SPC_figure(dic, A, B, C, D, k_thres):
@@ -147,34 +175,33 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     SPC_C = postproc.postproc_data(dic, C, False)
     SPC_D = postproc.postproc_data(dic, D, False)
     Hz_scale = dic['CPMG']['Hz_scale']
-    vert_scale_SPC = max(abs(SPC_A)) * 1.1
     fig2 = plt.figure()
     fig2.suptitle('CPMG NMR signal processing - SPC', fontsize=16)
     
     ax2_1 = fig2.add_subplot(411)
-    ax2_1.set_title('Shifted SPC')
+    ax2_1.set_title('Raw SPC')
     ax2_1.plot(Hz_scale, SPC_A.real)
     ax2_1.invert_xaxis()
-#    ax2_1.set_ylim([-vert_scale_SPC, vert_scale_SPC])
     
     ax2_2 = fig2.add_subplot(412)
-    ax2_2.set_title('Echo + global apodised SPC')
+    ax2_2.set_title(
+        'Apodized SPC, {:s} and {:s}'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull']))
     ax2_2.plot(Hz_scale, SPC_B.real)
     ax2_2.invert_xaxis()
-#    ax2_2.set_ylim([-vert_scale_SPC, vert_scale_SPC])
     
     ax2_3 = fig2.add_subplot(413)
     ax2_3.set_title('Denoised SPC, k = {:d}'.format(k_thres))
     ax2_3.plot(Hz_scale, SPC_C.real)
     ax2_3.invert_xaxis()
-#    ax2_3.set_ylim([-vert_scale_SPC, vert_scale_SPC])
     
     ax2_4 = fig2.add_subplot(414)
     ax2_4.set_title('Denoised and truncated SPC, k = {:d}'.format(k_thres))
+    ax2_4.set_xlabel('Frequency (Hz)')
     ax2_4.plot(Hz_scale, SPC_D.real)
     ax2_4.invert_xaxis()
     
-    fig2.tight_layout(rect=(0,0,1,0.95))
+    fig2.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
     fig2.show()
 
 def T2_figure(dic):
@@ -192,13 +219,15 @@ def T2_figure(dic):
     valFit = fit_func(fitEcho[0], timeFit)
     ax3_1.scatter(timeEcho, maxEcho)
     ax3_1.plot(timeFit, valFit)
+    ax3_1.set_xlabel('Time (ms)')
+    ax3_1.set_ylabel('Intensity')
     
     fig3.tight_layout(rect=(0,0,1,0.95))
     fig3.show()
 
 def plot_function(dic, A, B, C, D, k_thres):
     """Plotting"""
-    plt.ion()                               # interactive mode on
+    plt.ion()                                       # interactive mode on
     FID_figure(dic, A, B, C, D, k_thres)
     SPC_figure(dic, A, B, C, D, k_thres)
     T2_figure(dic)
@@ -207,19 +236,15 @@ def plot_function(dic, A, B, C, D, k_thres):
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 def main():
-    dic, FIDraw = data_import()
+    dic, FIDref, FIDraw = data_import()
     FIDshift = shift_FID(dic, FIDraw)
-#    FIDshift = FIDraw[:]
-    FIDapod = echo_apod(dic, FIDshift)
-#    FIDapod = FIDshift[:]
+    dic, FIDapod = echo_apod(dic, FIDshift)
     dic, FIDapod2 = global_apod(dic, FIDapod)
-#    FIDapod2 = FIDapod[:]
-#    FIDden, k_thres = denoise_nmr.denoise(FIDapod2)
-    FIDden, k_thres = FIDapod2[:], 0
+    FIDden, k_thres = denoise_nmr.denoise(
+        FIDapod2, k_thres='auto', max_err=5)
     FIDtrunc = trunc(dic, FIDden)
-#    FIDtrunc = FIDden[:]
-    plot_function(dic, FIDraw, FIDshift, FIDapod, FIDapod2, k_thres)
-    return dic, FIDraw
+    plot_function(dic, FIDraw, FIDapod2, FIDden, FIDtrunc, k_thres)
+    return dic, FIDref, FIDraw
 
 if __name__ == "__main__":
     main()

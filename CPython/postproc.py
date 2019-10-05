@@ -51,6 +51,7 @@ def CPMG_dic(dic, td2, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     dic['CPMG']['TD2'] = td2                            # complex points TD / 2
     dic['CPMG']['DW2'] = dw2                        # complex dwell time DW * 2
     dic['CPMG']['AQ'] = acquiT                          # acquisition time
+    dic['CPMG']['dureeSignal'] = dureeSignal            # acquisition time
     dic['CPMG']['firstDec'] = firstDec                  # first decrease
     dic['CPMG']['fullEcho'] = fullEcho                  # full echo delay
     dic['CPMG']['halfEcho'] = halfEcho                  # half echo delay
