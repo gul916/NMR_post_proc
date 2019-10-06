@@ -24,10 +24,10 @@ def CPMG_dic(dic, td2, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     dw2 = 1 / dic['acqus']['SW_h']                  # complex dwell time DW * 2
     acquiT = dw2 * (td2-1)                              # acquisition time
     halfEcho = fullEcho / 2
+    nbPtHalfEcho = int(halfEcho / dw2)                  # points per half echo
     nbHalfEcho = nbEcho * 2                             # number of half echoes
     if firstDec == True:
         nbHalfEcho += 1
-    nbPtHalfEcho = int(halfEcho / dw2)                  # points per half echo
     nbPtSignal = nbPtHalfEcho * nbHalfEcho              # points with signal
     dureeSignal = (nbPtSignal -1) * dw2
     nbPtLast = td2 - nbPtSignal                         # unused point
