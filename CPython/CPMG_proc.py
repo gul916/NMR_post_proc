@@ -235,7 +235,6 @@ def FID_figure(dic, A, B, C, D, k_thres):
     ax1_4.set_ylim([-vert_scale_FID, vert_scale_FID])
     
     fig1.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
-    fig1.show()
 
 def SPC_figure(dic, A, B, C, D, k_thres):
     #Frequency domain figure
@@ -277,7 +276,6 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     ax2_4.invert_xaxis()
     
     fig2.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
-    fig2.show()
 
 def comp_figure(dic, B, D, F, G, k_thres):
     # Comparison figure
@@ -319,7 +317,6 @@ def comp_figure(dic, B, D, F, G, k_thres):
     ax3_4.set_xlabel('Frequency (Hz)')
 
     fig3.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
-    fig3.show()
 
 def details_figure(dic, E):
     # Details figure
@@ -357,15 +354,16 @@ def details_figure(dic, E):
         ax4_3.plot(Hz_scale, postproc.postproc_data(dic, E[i, :], False).real)
     
     fig4.tight_layout(rect=(0,0,1,0.95))
-    fig4.show()
 
 def plot_function(dic, A, B, C, D, E, F, G, k_thres):
     #Plotting
-    plt.ion()                                       # interactive mode on
+    plt.ion()                                   # to avoid stop when plotting
     FID_figure(dic, A, B, C, D, k_thres)
     SPC_figure(dic, A, B, C, D, k_thres)
     comp_figure(dic, B, D, F, G, k_thres)
     details_figure(dic, E)
+    plt.ioff()                                  # to avoid figure closing
+    plt.show()                                      # to allow zooming
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
@@ -388,4 +386,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    input('\nPress enter key to exit')      # wait before closing figures
+    

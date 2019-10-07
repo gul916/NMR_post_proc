@@ -22,8 +22,8 @@ def get_os_version():
 # Windows
 if get_os_version().startswith('windows'):
     CPYTHON_BIN = (
-        'C:/Windows/System32/cmd.exe /C'
-        + 'C:/ProgramData/Anaconda3/Scripts/activate.bat'
+        'C:/Windows/System32/cmd.exe /C '
+        + 'C:/ProgramData/Anaconda3/Scripts/activate.bat '
         + 'C:/ProgramData/Anaconda3 && python')
     NMR_POST_PROC = 'D:/Users/Guillaume/Documents/PYTHON/NMR_post_proc/'
 

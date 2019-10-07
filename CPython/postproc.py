@@ -26,9 +26,9 @@ def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     td2 = data.size
     fullEcho = float(fullEcho)
     nbEcho = int(nbEcho)
-    if firstDec == 'True':
+    if firstDec in ['True', 'true']:
         firstDec = True
-    elif firstDec == 'False':
+    elif firstDec in ['False', 'false']:
         firstDec = False
     nbPtShift = int(nbPtShift)
     
