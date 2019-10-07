@@ -73,11 +73,6 @@ def signal_generation():
     desc = firstDec
     Aref = np.array([])
 
-    # Store parameters intoa dictionary
-    dic = postproc.CPMG_pseudo_dic(td2, dw2)
-    dic = postproc.CPMG_dic(
-        dic, td2, fullEcho, nbEcho, firstDec, nbPtShift)
-
     # tracé de la courbe par les demi echos
     for i in range (0, nbHalfEcho):
         deb = i*halfEcho
@@ -118,6 +113,11 @@ def signal_generation():
         + 1j*np.random.normal(mean, std, td2))
     Anoisy = Adead + noise
     
+    # Store parameters into a dictionary
+    dic = postproc.CPMG_pseudo_dic(td2, dw2)
+    dic = postproc.CPMG_dic(
+        dic, Anoisy, fullEcho, nbEcho, firstDec, nbPtShift)
+
     return dic, Aref, Adead, Anoisy
 
 def plot_function(dic, Aref, Adead, Anoisy):
@@ -140,28 +140,28 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
     # Reference FID display
     ax1 = fig1.add_subplot(411)
-    ax1.set_title('Reference FID')
+    ax1.set_title('Reference FID, {:d} echoes'.format(nbEcho))
     ax1.plot(ms_scale, Aref.real)
     ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
     
     # FID display after dead time suppression
     ax2 = fig1.add_subplot(412)
-    ax2.set_title('FID after dead time suppression')
+    ax2.set_title('FID after dead time suppression, {:d} echoes'.format(nbEcho))
     ax2.plot(ms_scale, Adead.real)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
     
     # FID display after dead time suppression and noise addition
     ax3 = fig1.add_subplot(413)
-    ax3.set_title('FID after addition of noise')
+    ax3.set_title('FID after addition of noise, {:d} echoes'.format(nbEcho))
     ax3.plot(ms_scale, Anoisy.real)
     ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax3.set_ylim([-vert_scale, vert_scale])
     
     # Spectra display
     ax4 = fig1.add_subplot(414)
-    ax4.set_title('Noisy SPC and reference SPC')
+    ax4.set_title('Noisy SPC and truncated reference SPC')
     ax4.plot(Hz_scale, AnoisySPC.real)
     ax4.plot(Hz_scale, ArefSPC.real)
     ax4.invert_xaxis()
@@ -173,7 +173,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
-#    plot_function(dic, Aref, Adead, Anoisy)
+    plot_function(dic, Aref, Adead, Anoisy)
     return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------

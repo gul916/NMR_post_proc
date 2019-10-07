@@ -19,12 +19,23 @@ def CPMG_pseudo_dic(td2, dw2):
     dic['procs']['SI'] = ng.proc_base.largest_power_of_2(td2*4)
     return dic
 
-def CPMG_dic(dic, td2, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
+def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
+    # Importation
     si = dic['procs']['SI']                             # complex points SI
     dw2 = 1 / dic['acqus']['SW_h']                  # complex dwell time DW * 2
+    td2 = data.size
+    fullEcho = float(fullEcho)
+    nbEcho = int(nbEcho)
+    if firstDec == 'True':
+        firstDec = True
+    elif firstDec == 'False':
+        firstDec = False
+    nbPtShift = int(nbPtShift)
+    
+    # Calculations
     acquiT = dw2 * (td2-1)                              # acquisition time
     halfEcho = fullEcho / 2
-    nbPtHalfEcho = int(halfEcho / dw2)                  # points per half echo
+    nbPtHalfEcho = round(halfEcho / dw2)                # points per half echo
     nbHalfEcho = nbEcho * 2                             # number of half echoes
     if firstDec == True:
         nbHalfEcho += 1
@@ -36,7 +47,9 @@ def CPMG_dic(dic, td2, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     if fullEcho <= 0:
         raise ValueError('fullEcho must be > 0')
     if round((halfEcho / dw2) % 1, 2) not in (0.0, 1.0):
-        warnings.warn('HalfEcho is supposed to be a multiple of 2*dw')
+        warnings.warn('halfEcho is supposed to be a multiple of 2*dw')
+        halfEcho = nbPtHalfEcho * dw2
+        fullEcho = halfEcho * 2
     if (not isinstance(nbEcho, int)) and (not nbEcho >= 0):
         raise ValueError('nbEcho must be of type integer and > 0')
     if not isinstance(firstDec, bool):

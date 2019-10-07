@@ -17,14 +17,30 @@ import denoise_nmr
 import postproc
 
 #%%----------------------------------------------------------------------------
-### Importation of data
+### Importation and exportation of data
 ###----------------------------------------------------------------------------
 def data_import():
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 1:                                  # create a noisy FID
         dic, FIDref, FIDraw = CPMG_gen.main()
+    elif len(sys.argv) == 6:                                # import data
+        data_dir = sys.argv[1]
+        fullEcho = sys.argv[2]
+        nbEcho = sys.argv[3]
+        firstDec = sys.argv[4]
+        nbPtShift = sys.argv[5]
+        dic, FIDraw = postproc.import_data(data_dir)
+        dic = postproc.CPMG_dic(
+            dic, FIDraw, fullEcho, nbEcho, firstDec, nbPtShift)
+        FIDref = FIDraw[:]
     else:
-        raise NotImplementedError('Additional arguments are not yet supported')
+        raise NotImplementedError(
+            'Arguments should be data, fullEcho, nbEcho, firstDec, nbPtShift')
     return dic, FIDref, FIDraw
+
+def data_export(dic, data):
+    if len(sys.argv) > 1:                                  # save spectrum
+        data_dir = sys.argv[1]
+        postproc.export_data(dic, data, data_dir)
 
 def shift_FID(dic, data):
     ndata = data[:]                                 # avoid data corruption
@@ -32,6 +48,8 @@ def shift_FID(dic, data):
     if nbPtShift < 0:                                       # left shift
         ndata = ng.proc_base.ls(ndata, nbPtShift)
     elif nbPtShift > 0:                                     # right shift
+        # Backward linear prediction increases errors
+#        ndata = ng.proc_lp.lp(ndata, nbPtShift, mode='b', append='before')
         ndata = ng.proc_base.rs(ndata, nbPtShift)
     return ndata
 
@@ -156,7 +174,8 @@ def echo_sep(dic, data):
         ndata[row+int(firstDec), :] = (data[
             (2*row+int(firstDec))*nbPtHalfEcho:
             (2*row+int(firstDec)+2)*nbPtHalfEcho])
-    ndata2 = np.zeros((nbEchoApod+1, nbPtHalfEcho), dtype='complex128')
+    ndata2 = np.zeros(
+        (nbEchoApod+int(firstDec), nbPtHalfEcho), dtype='complex128')
     for row in range(nbEchoApod+int(firstDec)):
         ndata2[row, :] = ndata[row, nbPtHalfEcho:]
         ndata2[row, 1:] += (ndata[row, nbPtHalfEcho-1:0:-1].real
@@ -179,33 +198,37 @@ def FID_figure(dic, A, B, C, D, k_thres):
     acquiT = dic['CPMG']['AQ']
     halfEcho = dic['CPMG']['halfEcho']
     ms_scale = dic['CPMG']['ms_scale']
+    nbEchoApod = dic['CPMG']['nbEchoApod']
     vert_scale_FID = max(abs(A)) * 1.1
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal processing - FID', fontsize=16)
     
     ax1_1 = fig1.add_subplot(411)
-    ax1_1.set_title('Raw FID')
+    ax1_1.set_title('Noisy FID, {:d} echoes'.format(dic['CPMG']['nbEcho']))
     ax1_1.plot(ms_scale, A.real)
     ax1_1.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_1.set_ylim([-vert_scale_FID, vert_scale_FID])
     
     ax1_2 = fig1.add_subplot(412)
     ax1_2.set_title(
-        'Apodized FID, {:s} and {:s}, {:d} echoes'
-        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'],
-        dic['CPMG']['nbEchoApod']))
+        'Apodised FID, {:s} and {:s}, {:d} echoes'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod))
     ax1_2.plot(ms_scale[:B.size], B.real)
     ax1_2.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_2.set_ylim([-vert_scale_FID, vert_scale_FID])
     
     ax1_3 = fig1.add_subplot(413)
-    ax1_3.set_title('Denoised FID, k = {:d}'.format(k_thres))
+    ax1_3.set_title(
+        'Apodised and denoised FID, k = {:d}, {:d} echoes'
+        .format(k_thres, nbEchoApod))
     ax1_3.plot(ms_scale[:C.size], C.real)
     ax1_3.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_3.set_ylim([-vert_scale_FID, vert_scale_FID])
     
     ax1_4 = fig1.add_subplot(414)
-    ax1_4.set_title('Denoised and truncated FID, k = {:d}'.format(k_thres))
+    ax1_4.set_title(
+        'Apodised, denoised and truncated FID, k = {:d}, {:d} echoes'
+        .format(k_thres, nbEchoApod))
     ax1_4.set_xlabel('Time (ms)')
     ax1_4.plot(ms_scale[:D.size], D.real)
     ax1_4.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
@@ -221,30 +244,34 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     SPC_B = postproc.postproc_data(dic, B, False)
     SPC_C = postproc.postproc_data(dic, C, False)
     SPC_D = postproc.postproc_data(dic, D, False)
+    nbEchoApod = dic['CPMG']['nbEchoApod']
     Hz_scale = dic['CPMG']['Hz_scale']
     fig2 = plt.figure()
     fig2.suptitle('CPMG NMR signal processing - SPC', fontsize=16)
     
     ax2_1 = fig2.add_subplot(411)
-    ax2_1.set_title('Raw SPC')
+    ax2_1.set_title('Noisy SPC, {:d} echoes'.format(dic['CPMG']['nbEcho']))
     ax2_1.plot(Hz_scale, SPC_A.real)
     ax2_1.invert_xaxis()
     
     ax2_2 = fig2.add_subplot(412)
     ax2_2.set_title(
-        'Apodized SPC, {:s} and {:s}, {:d} echoes'
-        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'],
-        dic['CPMG']['nbEchoApod']))
+        'Apodised SPC, {:s} and {:s}, {:d} echoes'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod))
     ax2_2.plot(Hz_scale, SPC_B.real)
     ax2_2.invert_xaxis()
     
     ax2_3 = fig2.add_subplot(413)
-    ax2_3.set_title('Denoised SPC, k = {:d}'.format(k_thres))
+    ax2_3.set_title(
+        'Apodised and denoised SPC, k = {:d}, {:d} echoes'
+        .format(k_thres, nbEchoApod))
     ax2_3.plot(Hz_scale, SPC_C.real)
     ax2_3.invert_xaxis()
     
     ax2_4 = fig2.add_subplot(414)
-    ax2_4.set_title('Denoised and truncated SPC, k = {:d}'.format(k_thres))
+    ax2_4.set_title(
+        'Apodised, denoised and truncated SPC, k = {:d}, {:d} echoes'
+        .format(k_thres, nbEchoApod))
     ax2_4.set_xlabel('Frequency (Hz)')
     ax2_4.plot(Hz_scale, SPC_D.real)
     ax2_4.invert_xaxis()
@@ -252,122 +279,112 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     fig2.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
     fig2.show()
 
-def T2_figure(dic):
-    #T2 relaxaton fit figure
-    fitEcho = dic['CPMG']['fitEcho']
-    maxEcho = dic['CPMG']['maxEcho']
-    timeEcho = dic['CPMG']['timeEcho']
-    ms_scale = dic['CPMG']['ms_scale']
-    
-    fig3 = plt.figure()
-    ax3_1 = fig3.add_subplot(111)
-    ax3_1.set_title(
-        'Intensity of echoes, T2 = {:8.2f} ms'.format(fitEcho[0][1]))
-    timeFit = np.linspace(ms_scale[0], ms_scale[-1], 100)
-    valFit = fit_func(fitEcho[0], timeFit)
-    ax3_1.scatter(timeEcho, maxEcho)
-    ax3_1.plot(timeFit, valFit)
-    ax3_1.set_xlabel('Time (ms)')
-    ax3_1.set_ylabel('Intensity')
-    
-    fig3.tight_layout(rect=(0,0,1,0.95))
-    fig3.show()
-
-def mat_figure(dic, E):
-    # Separated echos Figure
-    row, col = E.shape
-    ms_scale = dic['CPMG']['ms_scale']
-    Hz_scale = dic['CPMG']['Hz_scale']
-    vert_scale_FID = max(abs(E[0,:])) * 1.1
-    vert_scale_SPC = max(abs(postproc.postproc_data(dic, E[0, :], False)))*1.1
-    
-    fig4 = plt.figure()
-    ax4_1 = fig4.add_subplot(121)
-    ax4_1.set_title('Separated echoes FID')
-    ax4_1.set_xlabel('Time (ms)')
-    ax4_1.set_ylabel('Intensity')
-    ax4_2 = fig4.add_subplot(122)
-    ax4_2.set_title('Separated echoes SPC')
-    ax4_2.set_xlabel('Frequency (Hz)')
-    ax4_2.set_ylabel('Intensity')
-    for i in range(row):
-        ax4_1.plot(ms_scale[:E[i,:].size], E[i, :].real + i*vert_scale_FID)
-        ax4_1.plot(ms_scale[:E[i,:].size], E[i, :].imag + i*vert_scale_FID)
-        ax4_2.plot(
-            Hz_scale, postproc.postproc_data(dic, E[i, :], False).real
-            + i*vert_scale_SPC)
-        ax4_2.plot(
-            Hz_scale, postproc.postproc_data(dic, E[i, :], False).imag
-            + i*vert_scale_SPC)
-    
-    fig4.tight_layout(rect=(0,0,1,0.95))
-    fig4.show()
-
 def comp_figure(dic, B, D, F, G, k_thres):
     # Comparison figure
     # Zero-filling, and Fourier transform
+    nbEcho = dic['CPMG']['nbEcho']
     nbEchoApod = dic['CPMG']['nbEchoApod']
     SPC_B = postproc.postproc_data(dic, B, False)
     SPC_D = postproc.postproc_data(dic, D, False)
     SPC_F = postproc.postproc_data(dic, F, False)
     SPC_G = postproc.postproc_data(dic, trunc(dic, G), False)
     Hz_scale = dic['CPMG']['Hz_scale']
-    fig5 = plt.figure()
-    fig5.suptitle('CPMG NMR signal processing - comparison', fontsize=16)
+    fig3 = plt.figure()
+    fig3.suptitle('CPMG NMR signal processing - comparison', fontsize=16)
     
-    ax5_1 = fig5.add_subplot(411)
-    ax5_1.set_title(
-        'Processed SPC, {:s} and {:s}'
-        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull']))
-    ax5_1.plot(Hz_scale, SPC_B.real / max(abs(SPC_B)))
-    ax5_1.invert_xaxis()
+    ax3_1 = fig3.add_subplot(411)
+    ax3_1.set_title(
+        'Apodised SPC, {:s} and {:s}, {:d} echoes'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod))
+    ax3_1.plot(Hz_scale, SPC_B.real / max(abs(SPC_B)))
+    ax3_1.invert_xaxis()
 
-    ax5_2 = fig5.add_subplot(412)
-    ax5_2.set_title(
-        'Summed SPC, {:d} echoes'.format(nbEchoApod))
-    ax5_2.plot(Hz_scale, SPC_F.real / max(abs(SPC_F)))
-    ax5_2.invert_xaxis()
+    ax3_2 = fig3.add_subplot(412)
+    ax3_2.set_title(
+        'Apodised and summed SPC, {:d} echoes'.format(nbEchoApod))
+    ax3_2.plot(Hz_scale, SPC_F.real / max(abs(SPC_F)))
+    ax3_2.invert_xaxis()
 
-    ax5_3 = fig5.add_subplot(413)
-    ax5_3.set_title('Denoised SPC, k = {:d}'.format(k_thres))
-    ax5_3.plot(Hz_scale, SPC_D.real / max(abs(SPC_D)))
-    ax5_3.invert_xaxis()
+    ax3_3 = fig3.add_subplot(413)
+    ax3_3.set_title(
+        'Apodised, denoised and truncated SPC, k = {:d}, {:d} echoes'
+        .format(k_thres, nbEchoApod))
+    ax3_3.plot(Hz_scale, SPC_D.real / max(abs(SPC_D)))
+    ax3_3.invert_xaxis()
 
-    ax5_4 = fig5.add_subplot(414)
-    ax5_4.set_title('Reference SPC')
-    ax5_4.plot(Hz_scale, SPC_G.real / max(abs(SPC_G)))
-    ax5_4.invert_xaxis()
-    ax5_4.set_xlabel('Frequency (Hz)')
+    ax3_4 = fig3.add_subplot(414)
+    ax3_4.set_title('Truncated reference SPC, {:d} echoes'.format(nbEcho))
+    ax3_4.plot(Hz_scale, SPC_G.real / max(abs(SPC_G)))
+    ax3_4.invert_xaxis()
+    ax3_4.set_xlabel('Frequency (Hz)')
 
-    fig5.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
-    fig5.show()
+    fig3.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
+    fig3.show()
+
+def details_figure(dic, E):
+    # Details figure
+    fitEcho = dic['CPMG']['fitEcho']
+    maxEcho = dic['CPMG']['maxEcho']
+    timeEcho = dic['CPMG']['timeEcho']
+    ms_scale = dic['CPMG']['ms_scale']
+    Hz_scale = dic['CPMG']['Hz_scale']
+    nbEchoApod = dic['CPMG']['nbEchoApod']
+    row, col = E.shape
+    fig4 = plt.figure()
+    fig4.suptitle('CPMG NMR signal processing - Details', fontsize=16)
+
+    ax4_1 = fig4.add_subplot(211)
+    ax4_1.set_title(
+        'Intensity of echoes, T2 = {:8.2f} ms'.format(fitEcho[0][1]))
+    timeFit = np.linspace(ms_scale[0], ms_scale[-1], 100)
+    valFit = fit_func(fitEcho[0], timeFit)
+    ax4_1.scatter(timeEcho, maxEcho)
+    ax4_1.plot(timeFit, valFit)
+    ax4_1.set_xlabel('Time (ms)')
+    ax4_1.set_ylabel('Intensity')
+    
+    ax4_2 = fig4.add_subplot(223)
+    ax4_2.set_title('Separated FID, {:d} echoes'.format(nbEchoApod))
+    ax4_2.set_xlabel('Time (ms)')
+    ax4_2.set_ylabel('Intensity')
+    ax4_3 = fig4.add_subplot(224)
+    ax4_3.set_title('Separated SPC, {:d} echoes'.format(nbEchoApod))
+    ax4_3.set_xlabel('Frequency (Hz)')
+    ax4_3.set_ylabel('Intensity')
+    ax4_3.invert_xaxis()
+    for i in range(row):
+        ax4_2.plot(ms_scale[:E[i,:].size], E[i, :].real)
+        ax4_3.plot(Hz_scale, postproc.postproc_data(dic, E[i, :], False).real)
+    
+    fig4.tight_layout(rect=(0,0,1,0.95))
+    fig4.show()
 
 def plot_function(dic, A, B, C, D, E, F, G, k_thres):
-    """Plotting"""
+    #Plotting
     plt.ion()                                       # interactive mode on
-#    FID_figure(dic, A, B, C, D, k_thres)
-#    SPC_figure(dic, A, B, C, D, k_thres)
-#    T2_figure(dic)
-#    mat_figure(dic, E)
+    FID_figure(dic, A, B, C, D, k_thres)
+    SPC_figure(dic, A, B, C, D, k_thres)
     comp_figure(dic, B, D, F, G, k_thres)
+    details_figure(dic, E)
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 def main():
-    dic, FIDref, FIDraw = data_import()
-    FIDshift = shift_FID(dic, FIDraw)
-    dic, FIDapod = echo_apod(dic, FIDshift, method='exp')
-    dic, FIDapod2 = global_apod(dic, FIDapod)
+    dic, FIDref, FIDraw = data_import()                     # importation
+    FIDshift = shift_FID(dic, FIDraw)                       # dead time
+    dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apodisation
+    dic, FIDapod2 = global_apod(dic, FIDapod)               # global apodisation
     FIDden, k_thres = denoise_nmr.denoise(
-        FIDapod2, k_thres='auto', max_err=5)
-    FIDtrunc = trunc(dic, FIDden)
-    FIDmat = echo_sep(dic, FIDapod2)
-    FIDsum = echo_sum(dic, FIDmat)
+        FIDapod2, k_thres='auto', max_err=5)                # denoising
+    FIDtrunc = trunc(dic, FIDden)                           # truncation
+    FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
+    FIDsum = echo_sum(dic, FIDmat)                          # echoes sum
     plot_function(
         dic, FIDraw, FIDapod2, FIDden, FIDtrunc, 
-        FIDmat, FIDsum, FIDref, k_thres)
-    return dic, FIDref, FIDraw
+        FIDmat, FIDsum, FIDref, k_thres)                    # plotting
+    SPCfinal = postproc.postproc_data(dic, FIDtrunc, False) # FFT without phasing
+    data_export(dic, SPCfinal)                              # saving
 
 if __name__ == "__main__":
     main()
