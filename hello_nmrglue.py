@@ -35,7 +35,7 @@ if fulldata_new == fulldata:
 COMMAND_LINE = [CPYTHON_BIN, CPYTHON_FILE, fulldata_new]
 if get_os_version().startswith('windows'):
     COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
-SHOW_STATUS('hello_nmrglue in progress. Please be patient.')
+SHOW_STATUS('hello_nmrglue in progress, please be patient.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 

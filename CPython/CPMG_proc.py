@@ -45,12 +45,23 @@ def data_export(dic, data):
 def shift_FID(dic, data):
     ndata = data[:]                                 # avoid data corruption
     nbPtShift = dic['CPMG']['nbPtShift']
+    # Correct dead time
     if nbPtShift < 0:                                       # left shift
         ndata = ng.proc_base.ls(ndata, nbPtShift)
+        dic['CPMG']['nbPtShift'] = 0                        # update dictionary
     elif nbPtShift > 0:                                     # right shift
         # Backward linear prediction increases errors
-#        ndata = ng.proc_lp.lp(ndata, nbPtShift, mode='b', append='before')
+        # ndata = ng.proc_lp.lp(ndata, nbPtShift, mode='b', append='before')
         ndata = ng.proc_base.rs(ndata, nbPtShift)
+    # Correct echo delay
+#    rest = 0.0
+#    ndata2 = np.zeros(td2)
+#    for i in range(nbEcho):
+#        rest += 2 * (halfEcho / dw2 - nbPtHalfEcho)
+#        if rest >= 1:
+#            print(i, rest)
+#            ndata2[]
+#            rest -= 1
     return ndata
 
 #%%----------------------------------------------------------------------------
@@ -60,32 +71,29 @@ def echo_apod(dic, data, method):
     # Apodisation for each half echo
     ndata = data[:dic['CPMG']['nbPtSignal']]        # discard useless points
     desc = dic['CPMG']['firstDec']
+    apod = np.ones(dic['CPMG']['nbPtSignal']+1)     # one additional point
     if method == 'cos':
         dic['CPMG']['apodEcho'] = 'cos'
-        apod = np.ones(dic['CPMG']['nbPtSignal']+1) # one additional point
-        for i in range(dic['CPMG']['nbHalfEcho']):
-            ptHalfEcho = slice(
-                i*dic['CPMG']['nbPtHalfEcho'],
-                (i+1)*dic['CPMG']['nbPtHalfEcho']+1)
-            apod[ptHalfEcho] = ng.proc_base.sp(
-                apod[ptHalfEcho], off=0.5, end=1, pow=1.0, rev=(not desc))
-            desc = not(desc)
-        apod = apod[:-1]            # discard last point used for calculation
     elif method == 'exp':
         T2 = dic['CPMG']['halfEcho']                        # in seconds
         lb = (1 / (np.pi * T2))                             # in Hz
         dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(int(lb)))
         lb *= (dic['CPMG']['DW2'])                          # in points
-        apod = np.ones(dic['CPMG']['nbPtSignal'])
-        for i in range(dic['CPMG']['nbHalfEcho']):
-            ptHalfEcho = slice(
-                i*dic['CPMG']['nbPtHalfEcho'],
-                (i+1)*dic['CPMG']['nbPtHalfEcho'])
-            apod[ptHalfEcho] = ng.proc_base.em(
-                apod[ptHalfEcho], lb, rev=(not desc))
-            desc = not(desc)
     else:
         raise NotImplementedError('Unkown method for echo apodisation')
+    for i in range(dic['CPMG']['nbHalfEcho']):
+        ptHalfEcho = slice(
+            i*dic['CPMG']['nbPtHalfEcho'],
+            (i+1)*dic['CPMG']['nbPtHalfEcho']+1)
+        if method == 'cos':
+            apod[ptHalfEcho] = ng.proc_base.sp(
+                apod[ptHalfEcho], off=0.5, end=1, pow=1.0, rev=(not desc))
+        elif method == 'exp':
+            apod[ptHalfEcho] = ng.proc_base.em(
+                apod[ptHalfEcho], lb, rev=(not desc))
+        apod[(i+1)*dic['CPMG']['nbPtHalfEcho']] = 1
+        desc = not(desc)
+    apod = apod[:-1]                # discard last point used for calculation
     ndata = ndata * apod
     return dic, ndata
 
@@ -110,43 +118,49 @@ def fit_func(p, x):
     fit = M0 * np.exp(-np.array(x) / T2) + noise
     return fit
 
-def findT2(timeEcho, maxEcho):
+def findT2(dic, data):
     # fitting function and residual calculation
     def residuals(p, x, y):
         err = y - fit_func(p, x)
         return err
-    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
-    # fit the trajectory using leastsq (fmin, etc can also be used)
-    result = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
-    return result
-
-def global_apod(dic, data):
-    ndata = data[:]                                 # avoid data corruption
     dureeSignal = 1e3*dic['CPMG']['dureeSignal']
     firstDec = dic['CPMG']['firstDec']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     firstMin = int(firstDec) * nbPtHalfEcho
-    timeEcho, maxEcho = findMaxEcho(dic, ndata)
-    fitEcho = findT2(timeEcho, maxEcho)
+    timeEcho, maxEcho = findMaxEcho(dic, data)
+    # fit the trajectory using leastsq
+    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
+    fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
+    # Find end of signal
     T2 = fitEcho[0][1]                                      # in milliseconds
     if 3*T2 > dureeSignal:
-        maxSignal = dic['CPMG']['nbPtSignal']
+        nbPtSignal = dic['CPMG']['nbPtSignal']
         T2 = min(T2, dureeSignal)
     else:
-        maxSignal = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
-    if (maxSignal - firstMin) % (2*nbPtHalfEcho) != 0:
-        maxSignal = (
-            ((maxSignal - firstMin) // (2*nbPtHalfEcho) + 1)
+        nbPtSignal = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
+    if (nbPtSignal - firstMin) % (2*nbPtHalfEcho) != 0:
+        nbPtSignal = (
+            ((nbPtSignal - firstMin) // (2*nbPtHalfEcho) + 1)
             *2*nbPtHalfEcho + firstMin)           # round to next full echo
-    lb_Hz = (1e3 / (np.pi * T2))                            # in Hz
-    lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
-    apod = np.ones(maxSignal)
-    apod = ng.proc_base.em(apod, lb)
-    ndata = ndata[:maxSignal] * apod                # discard useless points
-    nbEchoApod = int((maxSignal - firstMin) // (2*nbPtHalfEcho))
-    dic['CPMG']['fitEcho'] = fitEcho
-    dic['CPMG']['maxEcho'] = maxEcho
     dic['CPMG']['timeEcho'] = timeEcho
+    dic['CPMG']['maxEcho'] = maxEcho
+    dic['CPMG']['fitEcho'] = fitEcho
+    dic['CPMG']['T2'] = T2
+    dic['CPMG']['nbPtSignal'] = nbPtSignal
+    return dic
+
+def global_apod(dic, data):
+    ndata = data[:]                                 # avoid data corruption
+    nbPtSignal = dic['CPMG']['nbPtSignal']
+    firstDec = dic['CPMG']['firstDec']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
+    firstMin = int(firstDec) * nbPtHalfEcho
+    lb_Hz = (1e3 / (np.pi * dic['CPMG']['T2']))             # in Hz
+    lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
+    apod = np.ones(nbPtSignal)
+    apod = ng.proc_base.em(apod, lb)
+    ndata = ndata[:nbPtSignal] * apod                # discard useless points
+    nbEchoApod = int((nbPtSignal - firstMin) // (2*nbPtHalfEcho))
     dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(int(lb_Hz)))
     dic['CPMG']['nbEchoApod'] = nbEchoApod
     return dic, ndata
@@ -174,21 +188,25 @@ def echo_sep(dic, data):
         ndata[row+int(firstDec), :] = (data[
             (2*row+int(firstDec))*nbPtHalfEcho:
             (2*row+int(firstDec)+2)*nbPtHalfEcho])
-    ndata2 = np.zeros(
-        (nbEchoApod+int(firstDec), nbPtHalfEcho), dtype='complex128')
-    for row in range(nbEchoApod+int(firstDec)):
-        ndata2[row, :] = ndata[row, nbPtHalfEcho:]
-        ndata2[row, 1:] += (ndata[row, nbPtHalfEcho-1:0:-1].real
-            -1j*ndata[row, nbPtHalfEcho-1:0:-1].imag)
-    ndata2[0,:] *= int(firstDec) + 1
-    return ndata2
+    return ndata
 
 def echo_sum(dic, data):
+    firstDec = dic['CPMG']['firstDec']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     row, col = data.shape
-    ndata = np.zeros(col, dtype='complex128')
+    # Echoes folding
+    ndata = np.zeros(
+        (row, nbPtHalfEcho), dtype='complex128')
     for i in range(row):
-        ndata[:] += data[i, :]
-    return ndata
+        ndata[i, :] = data[i, nbPtHalfEcho:]
+        ndata[i, 1:] += (data[i, nbPtHalfEcho-1:0:-1].real
+            -1j*data[i, nbPtHalfEcho-1:0:-1].imag)
+    ndata[0,:] *= int(firstDec) + 1
+    # Echoes sum
+    ndata2 = np.zeros(nbPtHalfEcho, dtype='complex128')
+    for i in range(row):
+        ndata2[:] += ndata[i, :]
+    return ndata2
 
 #%%----------------------------------------------------------------------------
 ### Plotting
@@ -239,12 +257,17 @@ def FID_figure(dic, A, B, C, D, k_thres):
 def SPC_figure(dic, A, B, C, D, k_thres):
     #Frequency domain figure
     # Zero-filling, and Fourier transform
-    SPC_A = postproc.postproc_data(dic, A, False)
-    SPC_B = postproc.postproc_data(dic, B, False)
-    SPC_C = postproc.postproc_data(dic, C, False)
-    SPC_D = postproc.postproc_data(dic, D, False)
     nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
+    SPC_A = postproc.postproc_data(dic, A[nbPtShift:], False)
+    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
+    SPC_C = postproc.postproc_data(dic, C[nbPtShift:], False)
+    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
+    SPC_A = ng.proc_base.ps(SPC_A, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+    SPC_C = ng.proc_base.ps(SPC_C, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
     fig2 = plt.figure()
     fig2.suptitle('CPMG NMR signal processing - SPC', fontsize=16)
     
@@ -282,11 +305,15 @@ def comp_figure(dic, B, D, F, G, k_thres):
     # Zero-filling, and Fourier transform
     nbEcho = dic['CPMG']['nbEcho']
     nbEchoApod = dic['CPMG']['nbEchoApod']
-    SPC_B = postproc.postproc_data(dic, B, False)
-    SPC_D = postproc.postproc_data(dic, D, False)
-    SPC_F = postproc.postproc_data(dic, F, False)
-    SPC_G = postproc.postproc_data(dic, trunc(dic, G), False)
+    nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
+    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
+    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
+    SPC_F = postproc.postproc_data(dic, F[nbPtShift:], False)
+    SPC_G = postproc.postproc_data(dic, trunc(dic, G), False)
+    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+    SPC_F = ng.proc_base.ps(SPC_F, p0=45.0*nbPtShift, p1=-360*nbPtShift)
     fig3 = plt.figure()
     fig3.suptitle('CPMG NMR signal processing - comparison', fontsize=16)
     
@@ -318,52 +345,47 @@ def comp_figure(dic, B, D, F, G, k_thres):
 
     fig3.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
 
-def details_figure(dic, E):
+def echoes_figure(dic, E):
     # Details figure
     fitEcho = dic['CPMG']['fitEcho']
     maxEcho = dic['CPMG']['maxEcho']
     timeEcho = dic['CPMG']['timeEcho']
     ms_scale = dic['CPMG']['ms_scale']
-    Hz_scale = dic['CPMG']['Hz_scale']
     nbEchoApod = dic['CPMG']['nbEchoApod']
     row, col = E.shape
     fig4 = plt.figure()
-    fig4.suptitle('CPMG NMR signal processing - Details', fontsize=16)
+    fig4.suptitle('CPMG NMR signal processing - Echoes', fontsize=16)
 
     ax4_1 = fig4.add_subplot(211)
-    ax4_1.set_title(
+    ax4_1.set_title('Separated FID, {:d} echoes'.format(nbEchoApod))
+    ax4_1.set_xlabel('Time (ms)')
+    ax4_1.set_ylabel('Intensity')
+    for i in range(0, row, int(row/10)):
+        ax4_1.plot(ms_scale[:E[i,:].size], E[i, :].real)
+    ax4_1.axvline(
+        x=ms_scale[int(E[0,:].size/2)], color='k', linestyle=':', linewidth=2)
+
+    ax4_2 = fig4.add_subplot(212)
+    ax4_2.set_title(
         'Intensity of echoes, T2 = {:8.2f} ms'.format(fitEcho[0][1]))
     timeFit = np.linspace(ms_scale[0], ms_scale[-1], 100)
     valFit = fit_func(fitEcho[0], timeFit)
-    ax4_1.scatter(timeEcho, maxEcho)
-    ax4_1.plot(timeFit, valFit)
-    ax4_1.set_xlabel('Time (ms)')
-    ax4_1.set_ylabel('Intensity')
-    
-    ax4_2 = fig4.add_subplot(223)
-    ax4_2.set_title('Separated FID, {:d} echoes'.format(nbEchoApod))
+    ax4_2.scatter(timeEcho, maxEcho)
+    ax4_2.plot(timeFit, valFit)
     ax4_2.set_xlabel('Time (ms)')
     ax4_2.set_ylabel('Intensity')
-    ax4_3 = fig4.add_subplot(224)
-    ax4_3.set_title('Separated SPC, {:d} echoes'.format(nbEchoApod))
-    ax4_3.set_xlabel('Frequency (Hz)')
-    ax4_3.set_ylabel('Intensity')
-    ax4_3.invert_xaxis()
-    for i in range(row):
-        ax4_2.plot(ms_scale[:E[i,:].size], E[i, :].real)
-        ax4_3.plot(Hz_scale, postproc.postproc_data(dic, E[i, :], False).real)
     
     fig4.tight_layout(rect=(0,0,1,0.95))
 
 def plot_function(dic, A, B, C, D, E, F, G, k_thres):
     #Plotting
     plt.ion()                                   # to avoid stop when plotting
+    echoes_figure(dic, E)
+    comp_figure(dic, B, D, F, G, k_thres)
     FID_figure(dic, A, B, C, D, k_thres)
     SPC_figure(dic, A, B, C, D, k_thres)
-    comp_figure(dic, B, D, F, G, k_thres)
-    details_figure(dic, E)
     plt.ioff()                                  # to avoid figure closing
-    plt.show()                                      # to allow zooming
+    plt.show()                                  # to allow zooming
 
 #%%----------------------------------------------------------------------------
 ### When this file is executed directly
@@ -372,6 +394,7 @@ def main():
     dic, FIDref, FIDraw = data_import()                     # importation
     FIDshift = shift_FID(dic, FIDraw)                       # dead time
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apodisation
+    dic = findT2(dic, FIDapod)                              # relaxation
     dic, FIDapod2 = global_apod(dic, FIDapod)               # global apodisation
     FIDden, k_thres = denoise_nmr.denoise(
         FIDapod2, k_thres='auto', max_err=5)                # denoising
@@ -381,8 +404,7 @@ def main():
     plot_function(
         dic, FIDraw, FIDapod2, FIDden, FIDtrunc, 
         FIDmat, FIDsum, FIDref, k_thres)                    # plotting
-    SPCfinal = postproc.postproc_data(dic, FIDtrunc, False) # FFT without phasing
-    data_export(dic, SPCfinal)                              # saving
+#    data_export(dic, FIDtrunc, FIDsum, FIDapod2)            # saving
 
 if __name__ == "__main__":
     main()

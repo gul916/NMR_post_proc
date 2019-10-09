@@ -14,6 +14,19 @@ def fullpath(dataset):
     fulldata="%s/%s/%s/pdata/%s" % (dat[3], dat[0], dat[1], dat[2])
     return fulldata
 
+# CPMG options
+de = float(GETPAR('DE'))
+dw = float(GETPAR('DW'))
+options = INPUT_DIALOG(
+    'CPMG options',
+    'If you don\'t know these values, please calibrate them with cpmgcal',
+    ['fullEcho = ', 'nbEcho = ', 'firstDec = ', 'nbPtShift ='],
+    ['1e-3', '10', 'True', str(int(de/dw))],
+    ['full echo duration (s)', 'number of echoes (integer)',
+     'first decrease (True / False)',
+     'number of points to shift (>0: right shift, <0: left shift)'],
+    ['1', '1', '1', '1'])
+
 # Get raw data
 dataset = CURDATA()
 fulldata = fullpath(dataset)
@@ -31,23 +44,13 @@ if fulldata_new == fulldata:
     ERRMSG('Copy was not performed, cpmg aborted.', 'cpmg')
     EXIT()
 
-# SVD options
-options = INPUT_DIALOG(
-    'CPMG options', '',
-    ['fullEcho = ', 'nbEcho = ', 'firstDec = ', 'nbPtShift ='],
-    ['1e-3', '10', 'True', '2'],
-    ['full echo duration (s)', 'number of echoes (integer)',
-     'first decrease (True / False)',
-     'number of points to shift (>0: right shift, <0: left shift)'],
-    ['1', '1', '1', '1'])
-
 # Call to standard python
 COMMAND_LINE = [
     CPYTHON_BIN, CPYTHON_FILE, fulldata_new,
     options[0], options[1], options[2], options[3]]
 if get_os_version().startswith('windows'):
     COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
-SHOW_STATUS('CPMG processing in progress. Please be patient')
+SHOW_STATUS('CPMG processing in progress, please be patient.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 

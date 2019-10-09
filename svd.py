@@ -14,6 +14,12 @@ def fullpath(dataset):
     fulldata="%s/%s/%s/pdata/%s" % (dat[3], dat[0], dat[1], dat[2])
     return fulldata
 
+# SVD options
+options = INPUT_DIALOG(
+    'SVD options', '', ['k_thres = ', 'max_err = '], ['0', '7.5'],
+    ['0: automatic thresholding\n>0: manual thresholding',
+    'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
+
 # Get raw data
 dataset = CURDATA()
 fulldata = fullpath(dataset)
@@ -30,12 +36,6 @@ fulldata_new = fullpath(CURDATA())
 if fulldata_new == fulldata:
     ERRMSG('Copy was not performed, hello_nmrglue aborted.', 'hello_nmrglue')
     EXIT()
-
-# SVD options
-options = INPUT_DIALOG(
-    'SVD options', '', ['k_thres = ', 'max_err = '], ['0', '7.5'],
-    ['0: automatic thresholding\n>0: manual thresholding',
-    'allowed error (5-10 %)\nirrelevant if k_thres > 0'], ['1', '1'])
 
 # Call to standard python
 COMMAND_LINE = [

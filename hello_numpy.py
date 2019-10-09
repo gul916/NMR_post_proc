@@ -11,7 +11,7 @@ if get_os_version().startswith('windows'):
     COMMAND_LINE = " ".join(str(elm) for elm in COMMAND_LINE)
 
 # Call to standard python
-SHOW_STATUS('hello_numpy in progress')
+SHOW_STATUS('hello_numpy in progress.')
 p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 

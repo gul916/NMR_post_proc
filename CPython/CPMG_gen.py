@@ -23,7 +23,7 @@ nbEcho = 19
 # From Topspin interface
 td = 4000                       # nb of real points + nb of imag points
 dw = 50e-6                      # dwell time between two points
-de = 100e-6                     # dead time before signal acquisition
+de = 200e-6                     # dead time before signal acquisition
 #de = 0
 
 # Simulation of noise
@@ -116,7 +116,7 @@ def signal_generation():
     # Store parameters into a dictionary
     dic = postproc.CPMG_pseudo_dic(td2, dw2)
     dic = postproc.CPMG_dic(
-        dic, Anoisy, fullEcho, nbEcho, firstDec, nbPtShift)
+        dic, Anoisy, fullEcho, nbEcho, firstDec, nbPtShift*2)
 
     return dic, Aref, Adead, Anoisy
 
@@ -133,7 +133,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     Hz_scale = dic['CPMG']['Hz_scale']
     
     # Plotting
-    plt.ion()                           # interactive mode on
+    plt.ion()                                   # to avoid stop when plotting
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal synthesis', fontsize=16)
     vert_scale = max(abs(Aref)) * 1.1
@@ -169,11 +169,12 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
     # Avoid superpositions on figure
     fig1.tight_layout(rect=(0,0,1,0.95))
-    fig1.show()                 # Display figure
+    plt.ioff()                                  # to avoid figure closing
+    plt.show()                                  # to allow zooming
     
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
-    plot_function(dic, Aref, Adead, Anoisy)
+#    plot_function(dic, Aref, Adead, Anoisy)
     return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------
@@ -182,4 +183,3 @@ def main():
 
 if __name__ == "__main__":
     dic, Aref, Anoisy = main()
-    input('\nPress enter key to exit') # wait before closing figure

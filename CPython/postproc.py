@@ -26,16 +26,16 @@ def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     td2 = data.size
     fullEcho = float(fullEcho)
     nbEcho = int(nbEcho)
-    if firstDec in ['True', 'true']:
+    if firstDec in [True, 'True', 'true']:
         firstDec = True
-    elif firstDec in ['False', 'false']:
+    else:
         firstDec = False
-    nbPtShift = int(nbPtShift)
+    nbPtShift = round(int(nbPtShift) / 2)               # complex points
     
     # Calculations
     acquiT = dw2 * (td2-1)                              # acquisition time
     halfEcho = fullEcho / 2
-    nbPtHalfEcho = round(halfEcho / dw2)                # points per half echo
+    nbPtHalfEcho = int(halfEcho / dw2)                  # points per half echo
     nbHalfEcho = nbEcho * 2                             # number of half echoes
     if firstDec == True:
         nbHalfEcho += 1
@@ -69,6 +69,7 @@ def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     dic['CPMG']['fullEcho'] = fullEcho                  # full echo delay
     dic['CPMG']['halfEcho'] = halfEcho                  # half echo delay
     dic['CPMG']['nbEcho'] = nbEcho                      # number of echoes
+    dic['CPMG']['nbEchoApod'] = nbEcho                  # after apodisation
     dic['CPMG']['nbHalfEcho'] = nbHalfEcho              # number of half echoes
     dic['CPMG']['nbPtShift'] = nbPtShift                # points to shift
     dic['CPMG']['nbPtHalfEcho'] = nbPtHalfEcho          # points per half echo
