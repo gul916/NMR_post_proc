@@ -45,6 +45,10 @@ def data_export(dic, data):
 def shift_FID(dic, data):
     ndata = data[:]                                 # avoid data corruption
     nbPtShift = dic['CPMG']['nbPtShift']
+    firstDec = dic['CPMG']['firstDec']
+    dw2 = dic['CPMG']['DW2']
+    halfEcho = dic['CPMG']['halfEcho']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     # Correct dead time
     if nbPtShift < 0:                                       # left shift
         ndata = ng.proc_base.ls(ndata, nbPtShift)
@@ -54,15 +58,37 @@ def shift_FID(dic, data):
         # ndata = ng.proc_lp.lp(ndata, nbPtShift, mode='b', append='before')
         ndata = ng.proc_base.rs(ndata, nbPtShift)
     # Correct echo delay
-#    rest = 0.0
-#    ndata2 = np.zeros(td2)
-#    for i in range(nbEcho):
-#        rest += 2 * (halfEcho / dw2 - nbPtHalfEcho)
-#        if rest >= 1:
-#            print(i, rest)
-#            ndata2[]
-#            rest -= 1
-    return ndata
+    rest = 0.0
+    sumShift = 0
+    ndata2 = np.zeros(dic['CPMG']['TD2'], dtype='complex128')
+    if firstDec == True:
+        ndata2[:nbPtHalfEcho] = ndata[:nbPtHalfEcho]
+    else:
+        ndata2[:2*nbPtHalfEcho] = ndata[:2*nbPtHalfEcho]
+    for i in range(int(not(firstDec)), dic['CPMG']['nbEcho']):
+        ptEcho2 = slice(
+            (2*i + int(firstDec)) * nbPtHalfEcho - sumShift,
+            (2*(i+1) + int(firstDec)) * nbPtHalfEcho - sumShift)
+        rest += 2 * (halfEcho / dw2 - nbPtHalfEcho)
+        if rest >= 1:
+            ptEcho = slice(
+                (2*i + int(firstDec)) * nbPtHalfEcho + 1,
+                (2*(i+1) + int(firstDec)) * nbPtHalfEcho + 1)
+            rest -= 1.0
+            sumShift += 1
+        else:
+            ptEcho = slice(
+                (2*i + int(firstDec)) * nbPtHalfEcho,
+                (2*(i+1) + int(firstDec)) * nbPtHalfEcho)
+        ndata2[ptEcho2] = ndata[ptEcho]
+    if sumShift // (nbPtHalfEcho * 2) >= 1:
+        dic['CPMG']['nbEcho'] -= sumShift // (nbPtHalfEcho * 2)
+        dic['CPMG']['nbEchoApod'] = dic['CPMG']['nbEcho']
+        dic['CPMG']['nbHalfEcho'] -= 2 * sumShift // (nbPtHalfEcho * 2)
+        dic['CPMG']['nbPtSignal'] = nbPtHalfEcho * dic['CPMG']['nbHalfEcho']
+    dic['CPMG']['halfEcho'] = nbPtHalfEcho * dw2
+    dic['CPMG']['fullEcho'] = halfEcho * 2
+    return dic, ndata2
 
 #%%----------------------------------------------------------------------------
 ### Apodisation
@@ -260,14 +286,18 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     nbEchoApod = dic['CPMG']['nbEchoApod']
     nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
-    SPC_A = postproc.postproc_data(dic, A[nbPtShift:], False)
-    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
-    SPC_C = postproc.postproc_data(dic, C[nbPtShift:], False)
-    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
+    SPC_A = postproc.postproc_data(dic, A, False)
+    SPC_B = postproc.postproc_data(dic, B, False)
+    SPC_C = postproc.postproc_data(dic, C, False)
+    SPC_D = postproc.postproc_data(dic, D, False)
+#    SPC_A = postproc.postproc_data(dic, A[nbPtShift:], False)
+#    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
+#    SPC_C = postproc.postproc_data(dic, C[nbPtShift:], False)
+#    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
     SPC_A = ng.proc_base.ps(SPC_A, p0=45.0*nbPtShift, p1=-360*nbPtShift)
-    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
-    SPC_C = ng.proc_base.ps(SPC_C, p0=45.0*nbPtShift, p1=-360*nbPtShift)
-    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_C = ng.proc_base.ps(SPC_C, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
     fig2 = plt.figure()
     fig2.suptitle('CPMG NMR signal processing - SPC', fontsize=16)
     
@@ -303,42 +333,47 @@ def SPC_figure(dic, A, B, C, D, k_thres):
 def comp_figure(dic, B, D, F, G, k_thres):
     # Comparison figure
     # Zero-filling, and Fourier transform
-    nbEcho = dic['CPMG']['nbEcho']
     nbEchoApod = dic['CPMG']['nbEchoApod']
     nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
-    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
-    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
-    SPC_F = postproc.postproc_data(dic, F[nbPtShift:], False)
+    SPC_B = postproc.postproc_data(dic, B, False)
+    SPC_D = postproc.postproc_data(dic, D, False)
+    SPC_F = postproc.postproc_data(dic, F, False)
     SPC_G = postproc.postproc_data(dic, trunc(dic, G), False)
-    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
-    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
-    SPC_F = ng.proc_base.ps(SPC_F, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_B = postproc.postproc_data(dic, B[nbPtShift:], False)
+#    SPC_D = postproc.postproc_data(dic, D[nbPtShift:], False)
+#    SPC_F = postproc.postproc_data(dic, F[nbPtShift:], False)
+#    SPC_G = postproc.postproc_data(dic, trunc(dic, G), False)
+#    SPC_B = ng.proc_base.ps(SPC_B, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_D = ng.proc_base.ps(SPC_D, p0=45.0*nbPtShift, p1=-360*nbPtShift)
+#    SPC_F = ng.proc_base.ps(SPC_F, p0=45.0*nbPtShift, p1=-360*nbPtShift)
     fig3 = plt.figure()
     fig3.suptitle('CPMG NMR signal processing - comparison', fontsize=16)
     
     ax3_1 = fig3.add_subplot(411)
     ax3_1.set_title(
-        'Apodised SPC, {:s} and {:s}, {:d} echoes'
+        'Spikelets method, {:s} and {:s}, {:d} echoes'
         .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod))
     ax3_1.plot(Hz_scale, SPC_B.real / max(abs(SPC_B)))
     ax3_1.invert_xaxis()
 
     ax3_2 = fig3.add_subplot(412)
     ax3_2.set_title(
-        'Apodised and summed SPC, {:d} echoes'.format(nbEchoApod))
+        'Weighted sum method, {:s} and {:s}, {:d} echoes'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod))
     ax3_2.plot(Hz_scale, SPC_F.real / max(abs(SPC_F)))
     ax3_2.invert_xaxis()
 
     ax3_3 = fig3.add_subplot(413)
     ax3_3.set_title(
-        'Apodised, denoised and truncated SPC, k = {:d}, {:d} echoes'
-        .format(k_thres, nbEchoApod))
+        'Denoising method, {:s} and {:s}, {:d} echoes, k = {:d}'
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod,
+        k_thres))
     ax3_3.plot(Hz_scale, SPC_D.real / max(abs(SPC_D)))
     ax3_3.invert_xaxis()
 
     ax3_4 = fig3.add_subplot(414)
-    ax3_4.set_title('Truncated reference SPC, {:d} echoes'.format(nbEcho))
+    ax3_4.set_title('Reference SPC')
     ax3_4.plot(Hz_scale, SPC_G.real / max(abs(SPC_G)))
     ax3_4.invert_xaxis()
     ax3_4.set_xlabel('Frequency (Hz)')
@@ -360,7 +395,7 @@ def echoes_figure(dic, E):
     ax4_1.set_title('Separated FID, {:d} echoes'.format(nbEchoApod))
     ax4_1.set_xlabel('Time (ms)')
     ax4_1.set_ylabel('Intensity')
-    for i in range(0, row, int(row/10)):
+    for i in range(0, row, max(2, int(row/10))):
         ax4_1.plot(ms_scale[:E[i,:].size], E[i, :].real)
     ax4_1.axvline(
         x=ms_scale[int(E[0,:].size/2)], color='k', linestyle=':', linewidth=2)
@@ -380,10 +415,10 @@ def echoes_figure(dic, E):
 def plot_function(dic, A, B, C, D, E, F, G, k_thres):
     #Plotting
     plt.ion()                                   # to avoid stop when plotting
-    echoes_figure(dic, E)
-    comp_figure(dic, B, D, F, G, k_thres)
-    FID_figure(dic, A, B, C, D, k_thres)
+#    echoes_figure(dic, E)
+#    FID_figure(dic, A, B, C, D, k_thres)
     SPC_figure(dic, A, B, C, D, k_thres)
+    comp_figure(dic, B, D, F, G, k_thres)
     plt.ioff()                                  # to avoid figure closing
     plt.show()                                  # to allow zooming
 
@@ -392,7 +427,7 @@ def plot_function(dic, A, B, C, D, E, F, G, k_thres):
 ###----------------------------------------------------------------------------
 def main():
     dic, FIDref, FIDraw = data_import()                     # importation
-    FIDshift = shift_FID(dic, FIDraw)                       # dead time
+    dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apodisation
     dic = findT2(dic, FIDapod)                              # relaxation
     dic, FIDapod2 = global_apod(dic, FIDapod)               # global apodisation

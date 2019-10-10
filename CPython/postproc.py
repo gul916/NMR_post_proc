@@ -48,8 +48,6 @@ def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
         raise ValueError('fullEcho must be > 0')
     if round((halfEcho / dw2) % 1, 2) not in (0.0, 1.0):
         warnings.warn('halfEcho is supposed to be a multiple of 2*dw')
-        halfEcho = nbPtHalfEcho * dw2
-        fullEcho = halfEcho * 2
     if (not isinstance(nbEcho, int)) and (not nbEcho >= 0):
         raise ValueError('nbEcho must be of type integer and > 0')
     if not isinstance(firstDec, bool):

@@ -17,9 +17,11 @@ def plot_function(dic, data):
 
 def main():
     dic, _, FIDraw = CPMG_proc.data_import()                # importation
-    FIDshift = CPMG_proc.shift_FID(dic, FIDraw)             # dead time
-    FIDmat = CPMG_proc.echo_sep(dic, FIDshift)              # echoes separation
-    dic = CPMG_proc.findT2(dic, FIDshift)                   # relaxation
+    dic, FIDshift = CPMG_proc.shift_FID(dic, FIDraw)        # dead time
+    dic, FIDapod = CPMG_proc.echo_apod(
+        dic, FIDshift, method='exp')                        # echoes apodisation
+    dic = CPMG_proc.findT2(dic, FIDapod)                    # relaxation
+    FIDmat = CPMG_proc.echo_sep(dic, FIDapod)               # echoes separation
     plot_function(dic, FIDmat)                              # plotting
 
 if __name__ == "__main__":
