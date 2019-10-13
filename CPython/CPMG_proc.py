@@ -20,6 +20,7 @@ import postproc
 ### Importation and exportation of data
 ###----------------------------------------------------------------------------
 def data_import():
+    """Import or create data"""
     if len(sys.argv) == 1:                                  # create a noisy FID
         dic, FIDref, FIDraw = CPMG_gen.main()
     elif len(sys.argv) == 6:                                # import data
@@ -38,15 +39,19 @@ def data_import():
     return dic, FIDref, FIDraw
 
 def data_export(dic, data):
+    """Export data"""
     if len(sys.argv) > 1:                                  # save spectrum
         data_dir = sys.argv[1]
         postproc.export_data(dic, data, data_dir)
 
 def shift_FID(dic, data):
+    """Correct dead time and echo delay"""
     ndata = data[:]                                 # avoid data corruption
     nbPtShift = dic['CPMG']['nbPtShift']
     firstDec = dic['CPMG']['firstDec']
     dw2 = dic['CPMG']['DW2']
+    td2 = dic['CPMG']['TD2']
+    nbEcho = dic['CPMG']['nbEcho']
     halfEcho = dic['CPMG']['halfEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     # Correct dead time
@@ -60,28 +65,28 @@ def shift_FID(dic, data):
     # Correct echo delay
     rest = 0.0
     sumShift = 0
-    ndata2 = np.zeros(dic['CPMG']['TD2'], dtype='complex128')
-    if firstDec == True:
+    ndata2 = np.zeros(td2, dtype='complex128')
+    if firstDec == True:                                    # first echo
         ndata2[:nbPtHalfEcho] = ndata[:nbPtHalfEcho]
     else:
         ndata2[:2*nbPtHalfEcho] = ndata[:2*nbPtHalfEcho]
-    for i in range(int(not(firstDec)), dic['CPMG']['nbEcho']):
-        ptEcho2 = slice(
-            (2*i + int(firstDec)) * nbPtHalfEcho - sumShift,
-            (2*(i+1) + int(firstDec)) * nbPtHalfEcho - sumShift)
+    for i in range(int(not(firstDec)), nbEcho):             # following echoes
+        sliceNdata2 = slice(
+            (int(firstDec) + 2*i) * nbPtHalfEcho - sumShift,
+            (int(firstDec) + 2*(i+1)) * nbPtHalfEcho - sumShift)
         rest += 2 * (halfEcho / dw2 - nbPtHalfEcho)
-        if rest >= 1:
-            ptEcho = slice(
-                (2*i + int(firstDec)) * nbPtHalfEcho + 1,
-                (2*(i+1) + int(firstDec)) * nbPtHalfEcho + 1)
+        if rest >= 1:                                       # discard 1 point
+            sliceNdata = slice(
+                (int(firstDec) + 2*i) * nbPtHalfEcho + 1,
+                (int(firstDec) + 2*(i+1)) * nbPtHalfEcho + 1)
             rest -= 1.0
             sumShift += 1
-        else:
-            ptEcho = slice(
-                (2*i + int(firstDec)) * nbPtHalfEcho,
-                (2*(i+1) + int(firstDec)) * nbPtHalfEcho)
-        ndata2[ptEcho2] = ndata[ptEcho]
-    if sumShift // (nbPtHalfEcho * 2) >= 1:
+        else:                                               # copy data
+            sliceNdata = slice(
+                (int(firstDec) + 2*i) * nbPtHalfEcho,
+                (int(firstDec) + 2*(i+1)) * nbPtHalfEcho)
+        ndata2[sliceNdata2] = ndata[sliceNdata]
+    if sumShift // (nbPtHalfEcho * 2) >= 1:         # update dictionnary
         dic['CPMG']['nbEcho'] -= sumShift // (nbPtHalfEcho * 2)
         dic['CPMG']['nbEchoApod'] = dic['CPMG']['nbEcho']
         dic['CPMG']['nbHalfEcho'] -= 2 * sumShift // (nbPtHalfEcho * 2)
@@ -94,7 +99,7 @@ def shift_FID(dic, data):
 ### Apodisation
 ###----------------------------------------------------------------------------
 def echo_apod(dic, data, method):
-    # Apodisation for each half echo
+    """Apodisation for each half echo"""
     ndata = data[:dic['CPMG']['nbPtSignal']]        # discard useless points
     desc = dic['CPMG']['firstDec']
     apod = np.ones(dic['CPMG']['nbPtSignal']+1)     # one additional point
@@ -124,6 +129,7 @@ def echo_apod(dic, data, method):
     return dic, ndata
 
 def findMaxEcho(dic, data):
+    """Find maximum of each echo"""
     ndata = data[:]                                 # avoid data corruption
     nbHalfEcho = dic['CPMG']['nbHalfEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
@@ -140,12 +146,13 @@ def findMaxEcho(dic, data):
     return timeEcho, maxEcho
 
 def fit_func(p, x):
+    """Relaxation function"""
     M0, T2, noise = p
     fit = M0 * np.exp(-np.array(x) / T2) + noise
     return fit
 
 def findT2(dic, data):
-    # fitting function and residual calculation
+    """Fitting function and residuals calculation"""
     def residuals(p, x, y):
         err = y - fit_func(p, x)
         return err
@@ -176,6 +183,7 @@ def findT2(dic, data):
     return dic
 
 def global_apod(dic, data):
+    """Global apodisation"""
     ndata = data[:]                                 # avoid data corruption
     nbPtSignal = dic['CPMG']['nbPtSignal']
     firstDec = dic['CPMG']['firstDec']
@@ -194,15 +202,8 @@ def global_apod(dic, data):
 #%%----------------------------------------------------------------------------
 ### Final processing
 ###----------------------------------------------------------------------------
-def trunc(dic, data):
-    ndata = data[:]                                 # avoid data corruption
-    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    firstDec = dic['CPMG']['firstDec']
-    firstTop = int(not firstDec)*nbPtHalfEcho
-    ndata = ndata[firstTop: firstTop+nbPtHalfEcho]
-    return ndata
-
 def echo_sep(dic, data):
+    """Separation of echoes into a matrix"""
     firstDec = dic['CPMG']['firstDec']
     nbEchoApod = dic['CPMG']['nbEchoApod']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
@@ -216,7 +217,8 @@ def echo_sep(dic, data):
             (2*row+int(firstDec)+2)*nbPtHalfEcho])
     return ndata
 
-def echo_sum(dic, data):
+def mat_sum(dic, data):
+    """Folding and sum of echoes from matrix to 1D"""
     firstDec = dic['CPMG']['firstDec']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     row, col = data.shape
@@ -234,15 +236,72 @@ def echo_sum(dic, data):
         ndata2[:] += ndata[i, :]
     return ndata2
 
+def fid_sum(dic, data):
+    """Decrease number of echoes"""
+    firstDec = dic['CPMG']['firstDec']
+    nbEcho = dic['CPMG']['nbEchoApod']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
+    if firstDec == True:                        # keep intact first decrease
+        firstSum = 1
+    else:
+        firstSum = 2
+    maxNbEcho2 = 10                                 # maximum number of echoes
+    nbEchoSum = round((nbEcho - firstSum//2) / maxNbEcho2)  # summed echoes
+    nbEcho2 = (nbEcho - firstSum//2) // nbEchoSum           # new nb of echoes
+    rest = (nbEcho - firstSum//2) % nbEchoSum               # last echoes
+    ndata = np.zeros(
+        (firstSum + 2*nbEcho2) * nbPtHalfEcho, dtype='complex128')
+    # First echo
+    sliceData = slice(0, firstSum*nbPtHalfEcho)
+    sliceNdata = sliceData
+    ndata[sliceNdata] = data[sliceData]                     # new data
+    # Following echoes
+    for i in range(nbEcho2-1):
+        sumEcho = np.zeros(2*nbPtHalfEcho, dtype='complex128')
+        for k in range(i*nbEchoSum, (i+1)*nbEchoSum):
+            sliceData = slice(
+                (firstSum + 2*k) * nbPtHalfEcho,
+                (firstSum + 2*k + 2) * nbPtHalfEcho)
+            sumEcho += data[sliceData]                      # old data
+        sliceNdata = slice(
+            (firstSum + 2*i) * nbPtHalfEcho,
+            (firstSum + 2*i + 2) * nbPtHalfEcho)
+        ndata[sliceNdata] = sumEcho / nbEchoSum             # new data
+    # Last echo
+    for i in range(nbEcho2-1, nbEcho2):
+        sumEcho = np.zeros(2*nbPtHalfEcho, dtype='complex128')
+        for k in range(i*nbEchoSum, nbEcho-firstSum//2):
+            sliceData = slice(
+                (firstSum + 2*k) * nbPtHalfEcho,
+                (firstSum + 2*k + 2) * nbPtHalfEcho)
+            sumEcho += data[sliceData]                      # old data
+        sliceNdata = slice(
+            (firstSum + 2*i) * nbPtHalfEcho,
+            (firstSum + 2*i + 2) * nbPtHalfEcho)
+        ndata[sliceNdata] = sumEcho / (nbEchoSum + rest)    # new data
+    # Update dictionary
+    dic['CPMG']['nbEchoDen'] = nbEcho2 + firstSum//2
+    return dic, ndata
+
+def trunc(dic, data):
+    """Truncation of first half echo"""
+    ndata = data[:]                                 # avoid data corruption
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
+    firstDec = dic['CPMG']['firstDec']
+    firstTop = int(not firstDec)*nbPtHalfEcho
+    ndata = ndata[firstTop: firstTop+nbPtHalfEcho]
+    return ndata
+
 #%%----------------------------------------------------------------------------
 ### Plotting
 ###----------------------------------------------------------------------------
 def FID_figure(dic, A, B, C, D, k_thres):
-    #Time domain figure
+    """Time domain figure"""
     acquiT = dic['CPMG']['AQ']
     halfEcho = dic['CPMG']['halfEcho']
     ms_scale = dic['CPMG']['ms_scale']
     nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbEchoDen = dic['CPMG']['nbEchoDen']
     vert_scale_FID = max(abs(A)) * 1.1
     fig1 = plt.figure()
     fig1.suptitle('CPMG NMR signal processing - FID', fontsize=16)
@@ -264,7 +323,7 @@ def FID_figure(dic, A, B, C, D, k_thres):
     ax1_3 = fig1.add_subplot(413)
     ax1_3.set_title(
         'Apodised and denoised FID, k = {:d}, {:d} echoes'
-        .format(k_thres, nbEchoApod))
+        .format(k_thres, nbEchoDen))
     ax1_3.plot(ms_scale[:C.size], C.real)
     ax1_3.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     ax1_3.set_ylim([-vert_scale_FID, vert_scale_FID])
@@ -272,7 +331,7 @@ def FID_figure(dic, A, B, C, D, k_thres):
     ax1_4 = fig1.add_subplot(414)
     ax1_4.set_title(
         'Apodised, denoised and truncated FID, k = {:d}, {:d} echoes'
-        .format(k_thres, nbEchoApod))
+        .format(k_thres, nbEchoDen))
     ax1_4.set_xlabel('Time (ms)')
     ax1_4.plot(ms_scale[:D.size], D.real)
     ax1_4.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
@@ -281,9 +340,10 @@ def FID_figure(dic, A, B, C, D, k_thres):
     fig1.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
 
 def SPC_figure(dic, A, B, C, D, k_thres):
-    #Frequency domain figure
+    """Frequency domain figure"""
     # Zero-filling, and Fourier transform
     nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbEchoDen = dic['CPMG']['nbEchoDen']
     nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
     SPC_A = postproc.postproc_data(dic, A, False)
@@ -316,14 +376,14 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     ax2_3 = fig2.add_subplot(413)
     ax2_3.set_title(
         'Apodised and denoised SPC, k = {:d}, {:d} echoes'
-        .format(k_thres, nbEchoApod))
+        .format(k_thres, nbEchoDen))
     ax2_3.plot(Hz_scale, SPC_C.real)
     ax2_3.invert_xaxis()
     
     ax2_4 = fig2.add_subplot(414)
     ax2_4.set_title(
         'Apodised, denoised and truncated SPC, k = {:d}, {:d} echoes'
-        .format(k_thres, nbEchoApod))
+        .format(k_thres, nbEchoDen))
     ax2_4.set_xlabel('Frequency (Hz)')
     ax2_4.plot(Hz_scale, SPC_D.real)
     ax2_4.invert_xaxis()
@@ -331,9 +391,10 @@ def SPC_figure(dic, A, B, C, D, k_thres):
     fig2.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
 
 def comp_figure(dic, B, D, F, G, k_thres):
-    # Comparison figure
+    """Comparison figure"""
     # Zero-filling, and Fourier transform
     nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbEchoDen = dic['CPMG']['nbEchoDen']
     nbPtShift = dic['CPMG']['nbPtShift']
     Hz_scale = dic['CPMG']['Hz_scale']
     SPC_B = postproc.postproc_data(dic, B, False)
@@ -367,7 +428,7 @@ def comp_figure(dic, B, D, F, G, k_thres):
     ax3_3 = fig3.add_subplot(413)
     ax3_3.set_title(
         'Denoising method, {:s} and {:s}, {:d} echoes, k = {:d}'
-        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoApod,
+        .format(dic['CPMG']['apodEcho'], dic['CPMG']['apodFull'], nbEchoDen,
         k_thres))
     ax3_3.plot(Hz_scale, SPC_D.real / max(abs(SPC_D)))
     ax3_3.invert_xaxis()
@@ -381,7 +442,7 @@ def comp_figure(dic, B, D, F, G, k_thres):
     fig3.tight_layout(rect=(0,0,1,0.95))            # Avoid superpositions
 
 def echoes_figure(dic, E):
-    # Details figure
+    """Details figure"""
     fitEcho = dic['CPMG']['fitEcho']
     maxEcho = dic['CPMG']['maxEcho']
     timeEcho = dic['CPMG']['timeEcho']
@@ -413,12 +474,12 @@ def echoes_figure(dic, E):
     fig4.tight_layout(rect=(0,0,1,0.95))
 
 def plot_function(dic, A, B, C, D, E, F, G, k_thres):
-    #Plotting
+    """Plotting"""
     plt.ion()                                   # to avoid stop when plotting
 #    echoes_figure(dic, E)
-#    FID_figure(dic, A, B, C, D, k_thres)
+    FID_figure(dic, A, B, C, D, k_thres)
     SPC_figure(dic, A, B, C, D, k_thres)
-    comp_figure(dic, B, D, F, G, k_thres)
+#    comp_figure(dic, B, D, F, G, k_thres)
     plt.ioff()                                  # to avoid figure closing
     plt.show()                                  # to allow zooming
 
@@ -426,19 +487,22 @@ def plot_function(dic, A, B, C, D, E, F, G, k_thres):
 ### When this file is executed directly
 ###----------------------------------------------------------------------------
 def main():
+    """Min CPMG processing function"""
     dic, FIDref, FIDraw = data_import()                     # importation
     dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
-    dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apodisation
+    dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apod
     dic = findT2(dic, FIDapod)                              # relaxation
-    dic, FIDapod2 = global_apod(dic, FIDapod)               # global apodisation
-    FIDden, k_thres = denoise_nmr.denoise(
-        FIDapod2, k_thres='auto', max_err=5)                # denoising
-    FIDtrunc = trunc(dic, FIDden)                           # truncation
+    dic, FIDapod2 = global_apod(dic, FIDapod)               # global apod
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
-    FIDsum = echo_sum(dic, FIDmat)                          # echoes sum
+    FIDsum2 = mat_sum(dic, FIDmat)                          # echoes sum
+
+    dic, FIDsum = fid_sum(dic, FIDapod2)                    # decrease nbEchoes
+    FIDden, k_thres = denoise_nmr.denoise(
+        FIDsum, k_thres='auto', max_err=5)                  # denoising
+    FIDtrunc = trunc(dic, FIDden)                           # truncation
     plot_function(
         dic, FIDraw, FIDapod2, FIDden, FIDtrunc, 
-        FIDmat, FIDsum, FIDref, k_thres)                    # plotting
+        FIDmat, FIDsum2, FIDref, k_thres)                   # plotting
 #    data_export(dic, FIDtrunc, FIDsum, FIDapod2)            # saving
 
 if __name__ == "__main__":

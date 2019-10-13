@@ -19,7 +19,7 @@ def main():
     dic, _, FIDraw = CPMG_proc.data_import()                # importation
     dic, FIDshift = CPMG_proc.shift_FID(dic, FIDraw)        # dead time
     dic, FIDapod = CPMG_proc.echo_apod(
-        dic, FIDshift, method='exp')                        # echoes apodisation
+        dic, FIDshift, method='exp')                        # echoes apod
     dic = CPMG_proc.findT2(dic, FIDapod)                    # relaxation
     FIDmat = CPMG_proc.echo_sep(dic, FIDapod)               # echoes separation
     plot_function(dic, FIDmat)                              # plotting

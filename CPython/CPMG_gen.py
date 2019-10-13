@@ -174,7 +174,7 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
-    plot_function(dic, Aref, Adead, Anoisy)
+#    plot_function(dic, Aref, Adead, Anoisy)
     return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------
