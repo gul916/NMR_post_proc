@@ -134,47 +134,46 @@ def plot_function(dic, Aref, Adead, Anoisy):
     
     # Plotting
     plt.ion()                                   # to avoid stop when plotting
-    fig1 = plt.figure()
-    fig1.suptitle('CPMG NMR signal synthesis', fontsize=16)
+    fig = plt.figure()
+    fig.suptitle('CPMG NMR signal synthesis', fontsize=16)
     vert_scale = max(abs(Aref)) * 1.1
     
     # Reference FID display
-    ax1 = fig1.add_subplot(411)
+    ax1 = fig.add_subplot(411)
     ax1.set_title('Reference FID, {:d} echoes'.format(nbEcho))
     ax1.plot(ms_scale, Aref.real)
     ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
     
     # FID display after dead time suppression
-    ax2 = fig1.add_subplot(412)
+    ax2 = fig.add_subplot(412)
     ax2.set_title('FID after dead time suppression, {:d} echoes'.format(nbEcho))
     ax2.plot(ms_scale, Adead.real)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
     
     # FID display after dead time suppression and noise addition
-    ax3 = fig1.add_subplot(413)
+    ax3 = fig.add_subplot(413)
     ax3.set_title('FID after addition of noise, {:d} echoes'.format(nbEcho))
     ax3.plot(ms_scale, Anoisy.real)
     ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax3.set_ylim([-vert_scale, vert_scale])
     
     # Spectra display
-    ax4 = fig1.add_subplot(414)
+    ax4 = fig.add_subplot(414)
     ax4.set_title('Noisy SPC and truncated reference SPC')
     ax4.plot(Hz_scale, AnoisySPC.real)
     ax4.plot(Hz_scale, ArefSPC.real)
     ax4.invert_xaxis()
     ax4.set_xlabel('Frequency (Hz)')
     
-    # Avoid superpositions on figure
-    fig1.tight_layout(rect=(0,0,1,0.95))
+    fig.tight_layout(rect=(0, 0, 1, 0.95))      # Avoid superpositions
     plt.ioff()                                  # to avoid figure closing
     plt.show()                                  # to allow zooming
     
 def main():
     dic, Aref, Adead, Anoisy = signal_generation()
-#    plot_function(dic, Aref, Adead, Anoisy)
+    plot_function(dic, Aref, Adead, Anoisy)
     return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------

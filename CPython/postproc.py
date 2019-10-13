@@ -89,31 +89,30 @@ def import_data(data_dir):
 def export_data(dic, data, data_dir):
     # Write data
     # Data should have exatly the original processed size (bug #109)
-    scaling = 8
     if data.ndim == 1:
         ng.bruker.write_pdata(
-            data_dir, dic, data.real*scaling,
-            scale_data=True, bin_file='1r', overwrite=True)
+            data_dir, dic, data.real,
+            scale_data=False, bin_file='1r', overwrite=True)
         ng.bruker.write_pdata(
-            data_dir, dic, data.imag*scaling,
-            scale_data=True, bin_file='1i', overwrite=True)
+            data_dir, dic, data.imag,
+            scale_data=False, bin_file='1i', overwrite=True)
     elif data.ndim == 2:
         datarr = data[::2,:].real
         datari = data[1::2,:].real
         datair = data[::2,:].imag
         dataii = data[1::2,:].imag
         ng.bruker.write_pdata(
-            data_dir, dic, datarr*scaling,
-            scale_data=True, bin_file='2rr', overwrite=True)
+            data_dir, dic, datarr,
+            scale_data=False, bin_file='2rr', overwrite=True)
         ng.bruker.write_pdata(
-            data_dir, dic, datari*scaling,
-            scale_data=True, bin_file='2ri', overwrite=True)
+            data_dir, dic, datari,
+            scale_data=False, bin_file='2ri', overwrite=True)
         ng.bruker.write_pdata(
-            data_dir, dic, datair*scaling,
-            scale_data=True, bin_file='2ir', overwrite=True)
+            data_dir, dic, datair,
+            scale_data=False, bin_file='2ir', overwrite=True)
         ng.bruker.write_pdata(
-            data_dir, dic, dataii*scaling,
-            scale_data=True, bin_file='2ii', overwrite=True)
+            data_dir, dic, dataii,
+            scale_data=False, bin_file='2ii', overwrite=True)
     else:
         raise NotImplementedError(
             "Data of", data.ndim, "dimensions are not yet supported.")

@@ -35,7 +35,7 @@ fulldata = fullpath(dataset)
 dataset_new = dataset[:]    # copy the original array
 dataset_new[1]= INPUT_DIALOG(
     'Copy dataset', '', ['new expno ='], [str(int(dataset[1])+100)])[0]
-XCMD(str('wrpa ' + dataset_new[1]))
+XCMD(str('wrpa ' + dataset_new[1] + ' 1'))
 RE(dataset_new)
 
 # Verification
@@ -43,6 +43,12 @@ fulldata_new = fullpath(CURDATA())
 if fulldata_new == fulldata:
     ERRMSG('Copy was not performed, cpmg aborted.', 'cpmg')
     EXIT()
+
+# Update parameters
+PUTPAR('PH_mod', 'pk')
+EFP()
+XCMD(str('wrp ' + '2'))
+XCMD(str('wrp ' + '3'))
 
 # Call to standard python
 COMMAND_LINE = [
@@ -55,6 +61,6 @@ p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 
 # Display result
-RE(dataset_new)
+XCMD(str('rep ' + '3'))
 VIEWTEXT(title='cpmg', header='Output of cpmg script',
      text=output+'\n'+err, modal=0)

@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 # User defined libraries
 import CPMG_proc
 
-def plot_function(dic, data):
+def plot_function(dic, D):
     plt.ion()                                   # to avoid stop when plotting
-    CPMG_proc.echoes_figure(dic, data)          # plotting
+    CPMG_proc.echoes_figure(dic, D)             # plotting
     plt.ioff()                                  # to avoid figure closing
     plt.show()                                  # to allow zooming
 
@@ -21,8 +21,7 @@ def main():
     dic, FIDapod = CPMG_proc.echo_apod(
         dic, FIDshift, method='exp')                        # echoes apod
     dic = CPMG_proc.findT2(dic, FIDapod)                    # relaxation
-    FIDmat = CPMG_proc.echo_sep(dic, FIDapod)               # echoes separation
-    plot_function(dic, FIDmat)                              # plotting
+    plot_function(dic, FIDapod)                             # plotting
 
 if __name__ == "__main__":
     main()
