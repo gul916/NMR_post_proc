@@ -32,8 +32,8 @@ std = 0.3
 
 # 1st frequency
 amp1 = 1                        # amplitude
-nu1 = 1750                      # frequency in Hz
-t21 = 100e-3                     # true T2 relaxation time
+nu1 = 2000                      # frequency in Hz
+t21 = 30e-3                     # true T2 relaxation time
 t21star = 1e-3                  # apparent T2 relaxation time
 sigma1 = np.sqrt(2*np.log(2))*t21star       # for Gaussian shape
 gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -41,7 +41,7 @@ gl1 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
 # 2nd frequency
 amp2 = 1                        # amplitude
 nu2 = -3000                     # frequency in Hz
-t22 = 30e-3                     # true T2 relaxation time
+t22 = 100e-3                    # true T2 relaxation time
 t22star = 1e-3                  # apparent T2 relaxation time
 sigma2 = np.sqrt(2*np.log(2))*t22star;      # for Gaussian shape
 gl2 = 1                         # 0: Lorentzian shape, 1: Gaussian shape
@@ -127,8 +127,8 @@ def plot_function(dic, Aref, Adead, Anoisy):
     else:
         ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho] * nbEcho
     # Zero-filling and Fourier transform
-    ArefSPC = postproc.postproc_data(dic, ArefSPC, False)
-    AnoisySPC = postproc.postproc_data(dic, Anoisy, False)
+    ArefSPC = postproc.postproc_data(dic, ArefSPC, False)[::-1]
+    AnoisySPC = postproc.postproc_data(dic, Anoisy, False)[::-1]
     ms_scale = dic['CPMG']['ms_scale']
     Hz_scale = dic['CPMG']['Hz_scale']
     

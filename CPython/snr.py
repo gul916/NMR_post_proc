@@ -12,7 +12,7 @@ import os.path
 import sys
 
 # Customize figures
-plt.rc('font', family='Times New Roman', size=16)       # default text
+#plt.rc('font', family='Times New Roman', size=16)       # default text
 plt.rc('mathtext', default='regular')                   # default equations
 
 def data_import():

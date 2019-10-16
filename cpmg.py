@@ -49,6 +49,7 @@ PUTPAR('PH_mod', 'pk')
 EFP()
 XCMD(str('wrp ' + '2'))
 XCMD(str('wrp ' + '3'))
+XCMD(str('wrp ' + '4'))
 
 # Call to standard python
 COMMAND_LINE = [
@@ -61,6 +62,6 @@ p = Popen(COMMAND_LINE, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 output, err = p.communicate()
 
 # Display result
-XCMD(str('rep ' + '3'))
+XCMD(str('rep ' + '4'))
 VIEWTEXT(title='cpmg', header='Output of cpmg script',
      text=output+'\n'+err, modal=0)
