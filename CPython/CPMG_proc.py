@@ -73,6 +73,7 @@ def data_export(dic, E, F, H):
 
 def shift_FID(dic, data):
     """Correct dead time and echo delay"""
+    # TODO: keep or discard first (half)-echo
     ndata = data[:]                                 # avoid data corruption
     nbPtShift = dic['CPMG']['nbPtShift']
     firstDec = dic['CPMG']['firstDec']
@@ -265,7 +266,7 @@ def mat_sum(dic, data):
         ndata2[:] += ndata[i, :]
     return ndata2
 
-def fid_sum(dic, data, firstIntact=False):
+def fid_sum(dic, data, firstIntact=True):
     """Decrease number of echoes"""
     # TODO: could probably be simplified
     firstDec = dic['CPMG']['firstDec']
@@ -274,7 +275,12 @@ def fid_sum(dic, data, firstIntact=False):
     firstEcho = int(firstDec)                               # first half echo
     firstSum = int(not(firstDec)) + 1                       # shift of echoes
     maxNbEcho2 = 25                             # maximum number of echoes
-    if firstIntact == True:                     # keep intact first decrease
+    ### Don't modify data
+    if nbEcho <= maxNbEcho2:
+        ndata = data[:]
+        dic['CPMG']['nbEchoDen'] = nbEcho
+    ### Keep intact first decrease
+    elif firstIntact == True:
         nbEchoSum = max(
                 1, round((nbEcho - firstSum//2) / maxNbEcho2))  # summed echoes
         nbEcho2 = (nbEcho - firstSum//2) // nbEchoSum       # new nb of echoes
@@ -296,7 +302,8 @@ def fid_sum(dic, data, firstIntact=False):
             sliceNdata = slice(
                 (firstSum + 2*i) * nbPtHalfEcho,
                 (firstSum + 2*i + 2) * nbPtHalfEcho)
-#            ndata[sliceNdata] = sumEcho / nbEchoSum # Increases discontinuity
+            # Averaging increases noise discontinuities
+#            ndata[sliceNdata] = sumEcho / nbEchoSum
             ndata[sliceNdata] = sumEcho                     # new data
         # Last echo
         for i in range(nbEcho2-1, nbEcho2):
@@ -309,11 +316,13 @@ def fid_sum(dic, data, firstIntact=False):
             sliceNdata = slice(
                 (firstSum + 2*i) * nbPtHalfEcho,
                 (firstSum + 2*i + 2) * nbPtHalfEcho)
-#            ndata[sliceNdata] = sumEcho / nbEchoSum # Increases discontinuity
+            # Averaging increases noise discontinuities
+#            ndata[sliceNdata] = sumEcho / nbEchoSum
             ndata[sliceNdata] = sumEcho                     # new data
             # Update dictionary
         dic['CPMG']['nbEchoDen'] = nbEcho2 + firstSum//2
-    else:                                       # Average first decrease
+    ### Average first decrease
+    elif firstIntact == False:
         nbEchoSum = max(
                 1, round((nbEcho + firstEcho) / maxNbEcho2))# summed echoes
         nbEcho2 = (nbEcho + firstEcho) // nbEchoSum         # new nb of echoes
