@@ -269,11 +269,11 @@ def fid_sum(dic, data, firstIntact=False):
     """Decrease number of echoes"""
     # TODO: could probably be simplified
     firstDec = dic['CPMG']['firstDec']
-    nbEcho = dic['CPMG']['nbEchoApod']
+    nbEcho = dic['CPMG']['nbEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     firstEcho = int(firstDec)                               # first half echo
     firstSum = int(not(firstDec)) + 1                       # shift of echoes
-    maxNbEcho2 = 10                             # maximum number of echoes
+    maxNbEcho2 = 25                             # maximum number of echoes
     if firstIntact == True:                     # keep intact first decrease
         nbEchoSum = max(
                 1, round((nbEcho - firstSum//2) / maxNbEcho2))  # summed echoes
@@ -575,7 +575,7 @@ def main():
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
     # Denoising method
-    dic, FIDsum = fid_sum(dic, FIDapod2, firstIntact=False) # decrease nbEchoes
+    dic, FIDsum = fid_sum(dic, FIDapod, firstIntact=True)   # decrease nbEchoes
     FIDden, k_thres = denoise_nmr.denoise(
         FIDsum, k_thres='auto', max_err=5)                  # denoising
     FIDtrunc = trunc(dic, FIDden)                           # truncation
