@@ -3,6 +3,5 @@
 
 import numpy as np
 
-
-print("\n")			# line jump
 np.show_config()
+print('\nnumpy was successfully tested')
