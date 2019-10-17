@@ -38,10 +38,15 @@ def data_import():
             'Arguments should be data, fullEcho, nbEcho, firstDec, nbPtShift')
     return dic, FIDref, FIDraw
 
-def data_export(dic, E, F, H):
+def data_export(dic, E, F, H, k_thres):
     """Export data"""
+    # TODO: find dephasing bug
     if len(sys.argv) > 1:                                   # save spectrum
+        apodEcho = dic['CPMG']['apodEcho']
+        apodFull = dic['CPMG']['apodFull']
         firstDec = dic['CPMG']['firstDec']
+        nbEchoApod = dic['CPMG']['nbEchoApod']
+        nbEchoDen = dic['CPMG']['nbEchoDen']
         nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
         firstMax = int(not(firstDec)) * nbPtHalfEcho
         nextMin = (int(not(firstDec)) + 1) * nbPtHalfEcho
@@ -58,13 +63,24 @@ def data_export(dic, E, F, H):
         # Writing title
         data_dir = sys.argv[1][:-1]
         with open(data_dir+'1/title', 'w+') as file:
-            file.write('Reference spectrum')
+            file.write('Reference spectrum\n')
+            file.write(
+                'Apodisation {:s} and {:s}'.format(apodEcho, apodFull))
         with open(data_dir+'2/title', 'w+') as file:
-            file.write('Spikelets method')
+            file.write('Spikelets method\n')
+            file.write(
+                'Apodisation {:s} and {:s}, {:d} echoes'
+                .format(apodEcho, apodFull, nbEchoApod))
         with open(data_dir+'3/title', 'w+') as file:
-            file.write('Weighted sum method')
+            file.write('Weighted sum method\n')
+            file.write(
+                'Apodisation {:s} and {:s}, {:d} echoes'
+                .format(apodEcho, apodFull, nbEchoApod))
         with open(data_dir+'4/title', 'w+') as file:
-            file.write('Denoising method')
+            file.write('Denoising method\n')
+            file.write(
+                'Apodisation {:s}, {:d} echoes, {:d} singular values'
+                .format(apodEcho, nbEchoDen, k_thres))
         # Writing data
         postproc.export_data(dic, SPC_Eref, data_dir + '1')
         postproc.export_data(dic, SPC_E, data_dir + '2')
@@ -84,7 +100,7 @@ def shift_FID(dic, data):
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     # Correct dead time
     if nbPtShift < 0:                                       # left shift
-        ndata = ng.proc_base.ls(ndata, nbPtShift)
+        ndata = ng.proc_base.ls(ndata, -nbPtShift)
         dic['CPMG']['nbPtShift'] = 0                        # update dictionary
     elif nbPtShift > 0:                                     # right shift
         # Backward linear prediction increases errors
@@ -586,13 +602,13 @@ def main():
     # Denoising method
     dic, FIDsum = fid_sum(dic, FIDapod, firstIntact=True)   # decrease nbEchoes
     FIDden, k_thres = denoise_nmr.denoise(
-        FIDsum, k_thres='auto', max_err=5)                  # denoising
+        FIDsum, k_thres='auto', max_err=7.5)                # denoising
     FIDtrunc = trunc(dic, FIDden)                           # truncation
     # Plotting
     plot_function(
         dic, FIDref, FIDraw, FIDshift, FIDapod, FIDapod2, FIDmatSum,
         FIDden, FIDtrunc, k_thres)
-    data_export(dic, FIDapod2, FIDmatSum, FIDtrunc)         # saving
+    data_export(dic, FIDapod2, FIDmatSum, FIDtrunc, k_thres)# saving
 
 if __name__ == "__main__":
     main()

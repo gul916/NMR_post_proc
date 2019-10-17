@@ -23,7 +23,7 @@ nbEcho = 19
 # From Topspin interface
 td = 4000                       # nb of real points + nb of imag points
 dw = 50e-6                      # dwell time between two points
-de = 200e-6                     # dead time before signal acquisition
+de = 100e-6                     # dead time before signal acquisition
 #de = 0
 
 # Simulation of noise
@@ -118,17 +118,19 @@ def signal_generation():
     dic = postproc.CPMG_dic(
         dic, Anoisy, fullEcho, nbEcho, firstDec, nbPtShift*2)
 
-    return dic, Aref, Adead, Anoisy
+    return dic, Aref, Anoisy
 
-def plot_function(dic, Aref, Adead, Anoisy):
-    # keep only a half echo for ArefSPC and normalization
+def plot_function(dic, Aref, Anoisy):
+    # keep only a half echo for ArefSPC
     if firstDec == True:
-        ArefSPC = Aref[:nbPtHalfEcho] * nbEcho
+        ArefSPC = Aref[:nbPtHalfEcho]
     else:
-        ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho] * nbEcho
-    # Zero-filling and Fourier transform
+        ArefSPC = Aref[nbPtHalfEcho:2*nbPtHalfEcho]
+    # Zero-filling and Fourier transform and mormalisation
     ArefSPC = postproc.postproc_data(dic, ArefSPC, False)[::-1]
     AnoisySPC = postproc.postproc_data(dic, Anoisy, False)[::-1]
+    ArefSPC /= max(abs(ArefSPC))
+    AnoisySPC /= max(abs(AnoisySPC))
     ms_scale = dic['CPMG']['ms_scale']
     Hz_scale = dic['CPMG']['Hz_scale']
     
@@ -139,41 +141,36 @@ def plot_function(dic, Aref, Adead, Anoisy):
     vert_scale = max(abs(Aref)) * 1.1
     
     # Reference FID display
-    ax1 = fig.add_subplot(411)
+    ax1 = fig.add_subplot(311)
     ax1.set_title('Reference FID, {:d} echoes'.format(nbEcho))
     ax1.plot(ms_scale, Aref.real)
     ax1.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax1.set_ylim([-vert_scale, vert_scale])
     
-    # FID display after dead time suppression
-    ax2 = fig.add_subplot(412)
-    ax2.set_title('FID after dead time suppression, {:d} echoes'.format(nbEcho))
-    ax2.plot(ms_scale, Adead.real)
+    # FID display after dead time suppression and noise addition
+    ax2 = fig.add_subplot(312)
+    ax2.set_title(
+        'FID after dead time suppression and addition of noise, {:d} echoes'
+        .format(nbEcho))
+    ax2.plot(ms_scale, Anoisy.real)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
     ax2.set_ylim([-vert_scale, vert_scale])
     
-    # FID display after dead time suppression and noise addition
-    ax3 = fig.add_subplot(413)
-    ax3.set_title('FID after addition of noise, {:d} echoes'.format(nbEcho))
-    ax3.plot(ms_scale, Anoisy.real)
-    ax3.set_xlim([-halfEcho * 1e3, (acquiT+halfEcho)*1e3])
-    ax3.set_ylim([-vert_scale, vert_scale])
-    
     # Spectra display
-    ax4 = fig.add_subplot(414)
-    ax4.set_title('Noisy SPC and truncated reference SPC')
-    ax4.plot(Hz_scale, AnoisySPC.real)
-    ax4.plot(Hz_scale, ArefSPC.real)
-    ax4.invert_xaxis()
-    ax4.set_xlabel('Frequency (Hz)')
+    ax3 = fig.add_subplot(313)
+    ax3.set_title('Noisy SPC and truncated reference SPC')
+    ax3.plot(Hz_scale, AnoisySPC.real)
+    ax3.plot(Hz_scale, ArefSPC.real)
+    ax3.invert_xaxis()
+    ax3.set_xlabel('Frequency (Hz)')
     
     fig.tight_layout(rect=(0, 0, 1, 0.95))      # Avoid superpositions
     plt.ioff()                                  # to avoid figure closing
     plt.show()                                  # to allow zooming
     
 def main():
-    dic, Aref, Adead, Anoisy = signal_generation()
-    plot_function(dic, Aref, Adead, Anoisy)
+    dic, Aref, Anoisy = signal_generation()
+    plot_function(dic, Aref, Anoisy)
     return dic, Aref, Anoisy
 
 #%%----------------------------------------------------------------------------
