@@ -211,10 +211,13 @@ def findT2(dic, data):
     fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
     # Find end of signal
     T2 = fitEcho[0][1]                                      # in milliseconds
-    if 3*T2 > dureeSignal:
+    if T2 < 1e3*dic['CPMG']['halfEcho']:                    # too short T2
+        nbPtApod = dic['CPMG']['nbPtSignal']
+        T2 = dureeSignal
+    elif 3*T2 > dureeSignal:                                # too long T2
         nbPtApod = dic['CPMG']['nbPtSignal']
         T2 = min(T2, dureeSignal)
-    else:
+    else:                                                   # intermediate T2
         nbPtApod = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
     if (nbPtApod - firstMin) % (2*nbPtHalfEcho) != 0:
         nbPtApod = (
