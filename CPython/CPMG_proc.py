@@ -276,8 +276,8 @@ def mat_sum(dic, data):
         (row, nbPtHalfEcho), dtype='complex128')
     for i in range(row):
         ndata[i, :] = data[i, nbPtHalfEcho:]
-        ndata[i, 1:] += (data[i, nbPtHalfEcho-1:0:-1].real
-            -1j*data[i, nbPtHalfEcho-1:0:-1].imag)
+        ndata[i, :] += (data[i, nbPtHalfEcho:0:-1].real
+            -1j*data[i, nbPtHalfEcho:0:-1].imag)
     ndata[0,:] *= int(firstDec) + 1
     # Echoes sum
     ndata2 = np.zeros(nbPtHalfEcho, dtype='complex128')
