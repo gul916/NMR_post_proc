@@ -67,7 +67,6 @@ def CPMG_dic(dic, data, fullEcho=1e-3, nbEcho=0, firstDec=True, nbPtShift=0):
     dic['CPMG']['fullEcho'] = fullEcho                  # full echo delay
     dic['CPMG']['halfEcho'] = halfEcho                  # half echo delay
     dic['CPMG']['nbEcho'] = nbEcho                      # number of echoes
-    dic['CPMG']['nbEchoApod'] = nbEcho                  # after apodisation
     dic['CPMG']['nbHalfEcho'] = nbHalfEcho              # number of half echoes
     dic['CPMG']['nbPtShift'] = nbPtShift                # points to shift
     dic['CPMG']['nbPtHalfEcho'] = nbPtHalfEcho          # points per half echo
