@@ -190,46 +190,6 @@ def global_apod(dic, data):
     return dic, ndata
 
 #%%----------------------------------------------------------------------------
-### T2 measurement
-###----------------------------------------------------------------------------
-def findMaxEcho(dic, data):
-    """Find maximum of each echo"""
-    ndata = data[:]                                 # avoid data corruption
-    nbHalfEcho = dic['CPMG']['nbHalfEcho']
-    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    firstDec = dic['CPMG']['firstDec']
-    ms_scale = dic['CPMG']['ms_scale']
-    maxEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
-    timeEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
-    for i in range(int(not(firstDec)), nbHalfEcho, 2):
-        maxSlice = slice(i * nbPtHalfEcho, (i+1) * nbPtHalfEcho)
-        maxIndex = i * nbPtHalfEcho
-        maxEcho[i//2] = max(abs(ndata[maxSlice]))           # max of echo
-        timeEcho[i//2] = ms_scale[maxIndex]                 # time of echo
-    maxEcho = maxEcho / max(maxEcho)                        # normalization
-    return timeEcho, maxEcho
-
-def fit_func(p, x):
-    """Relaxation function"""
-    M0, T2, noise = p
-    fit = M0 * np.exp(-np.array(x) / T2) + noise
-    return fit
-
-def findT2(dic, data):
-    """Fitting function and residuals calculation"""
-    def residuals(p, x, y):
-        err = y - fit_func(p, x)
-        return err
-    timeEcho, maxEcho = findMaxEcho(dic, data)
-    # fit the trajectory using leastsq
-    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
-    fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
-    dic['CPMG']['timeEcho'] = timeEcho
-    dic['CPMG']['maxEcho'] = maxEcho
-    dic['CPMG']['fitEcho'] = fitEcho
-    return dic
-
-#%%----------------------------------------------------------------------------
 ### Final processing
 ###----------------------------------------------------------------------------
 def echo_sep(dic, data):
@@ -379,22 +339,74 @@ def trunc(dic, data):
     return ndata
 
 #%%----------------------------------------------------------------------------
+### T2 measurement
+###----------------------------------------------------------------------------
+def findMaxEcho(dic, data):
+    """Find maximum of each echo"""
+    ndata = data[:]                                 # avoid data corruption
+    nbHalfEcho = dic['CPMG']['nbHalfEcho']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
+    firstDec = dic['CPMG']['firstDec']
+    ms_scale = dic['CPMG']['ms_scale']
+    maxEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
+    timeEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
+    for i in range(int(not(firstDec)), nbHalfEcho, 2):
+        maxSlice = slice(i * nbPtHalfEcho, (i+1) * nbPtHalfEcho)
+        maxIndex = i * nbPtHalfEcho
+        maxEcho[i//2] = max(abs(ndata[maxSlice]))           # max of echo
+        timeEcho[i//2] = ms_scale[maxIndex]                 # time of echo
+    maxEcho = maxEcho / max(maxEcho)                        # normalization
+    dic['CPMG']['timeEcho'] = timeEcho
+    dic['CPMG']['maxEcho'] = maxEcho
+    return dic
+
+def findT2(dic, data):
+    """Fitting function and residuals calculation"""
+    def fit_func(p, x):
+        """Relaxation function"""
+        M0, T2, noise = p
+        fit = M0 * np.exp(-np.array(x) / T2) + noise
+        return fit
+    def residuals(p, x, y):
+        """Calculate difference between data and fitting function"""
+        err = y - fit_func(p, x)
+        return err
+    timeEcho = dic['CPMG']['timeEcho']
+    maxEcho = dic['CPMG']['maxEcho']
+    ms_scale = dic['CPMG']['ms_scale']
+    # fit the trajectory using leastsq
+    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
+    fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
+    # final fit
+    fitTime = np.linspace(ms_scale[0], ms_scale[-1], 100)
+    fitVal = fit_func(fitEcho[0], fitTime)
+    dic['CPMG']['fitEcho'] = fitEcho
+    dic['CPMG']['fitTime'] = fitTime
+    dic['CPMG']['fitVal'] = fitVal
+    return dic
+
+#%%----------------------------------------------------------------------------
 ### Plotting
 ###----------------------------------------------------------------------------
-def echoes_figure(dic, D):
+def echoes_figure(dic, E):
     """Echoes figure"""
+    dic = findMaxEcho(dic, E)
+    dic = findT2(dic, E)                        # T2 relaxation measurement
+    Dmat = echo_sep(dic, E)                     # Separation of echoes
+    row, col = Dmat.shape
     fitEcho = dic['CPMG']['fitEcho']
+    fitTime = dic['CPMG']['fitTime']
+    fitVal = dic['CPMG']['fitVal']
     maxEcho = dic['CPMG']['maxEcho']
     timeEcho = dic['CPMG']['timeEcho']
     ms_scale = dic['CPMG']['ms_scale']
     nbEcho = dic['CPMG']['nbEcho']
-    Dmat = echo_sep(dic, D)
-    row, col = Dmat.shape
+
     fig = plt.figure()
     fig.suptitle('CPMG NMR signal processing - echoes', fontsize=16)
 
     ax1 = fig.add_subplot(211)
-    ax1.set_title('Separated FID, {:d} echoes'.format(nbEcho))
+    ax1.set_title('Separated FID, {:d} apodised echoes'.format(nbEcho))
     ax1.set_xlabel('Time (ms)')
     ax1.set_ylabel('Intensity')
     for i in range(0, row, max(2, int(row/10))):
@@ -405,11 +417,10 @@ def echoes_figure(dic, D):
 
     ax2 = fig.add_subplot(212)
     ax2.set_title(
-        'Intensity of echoes, T2 = {:8.2f} ms'.format(fitEcho[0][1]))
-    timeFit = np.linspace(ms_scale[0], ms_scale[-1], 100)
-    valFit = fit_func(fitEcho[0], timeFit)
+        'Intensity of apodised echoes, measured T2 = {:8.2f} ms'
+        .format(fitEcho[0][1]))
     ax2.scatter(timeEcho, maxEcho)
-    ax2.plot(timeFit, valFit)
+    ax2.plot(fitTime, fitVal)
     ax2.set_xlabel('Time (ms)')
     ax2.set_ylabel('Intensity')
     
@@ -562,7 +573,7 @@ def den_figure(dic, G, H, A, C, k_thres):
 def plot_function(dic, A, B, C, D, E, F, G, H, k_thres):
     """Plotting"""
     plt.ion()                                   # to avoid stop when plotting
-    echoes_figure(dic, D)
+    echoes_figure(dic, E)
     apod_figure(dic, B, D, E)
     sum_figure(dic, E, F, A, C)
     den_figure(dic, G, H, A, C, k_thres)
@@ -578,7 +589,6 @@ def main():
     dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
     # Spikelets and weighted sum methods
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apod
-    dic = findT2(dic, FIDapod)                              # relaxation
     dic, FIDapod2 = global_apod(dic, FIDapod)               # global apod
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
