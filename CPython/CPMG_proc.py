@@ -153,7 +153,7 @@ def echo_apod(dic, data, method):
         dic['CPMG']['apodEcho'] = 'cos'
     elif method == 'exp':
         T2 = dic['CPMG']['halfEcho']                        # in seconds
-        lb = (1 / (np.pi * T2))                             # in Hz
+        lb = (2 / (np.pi * T2))                             # in Hz
         dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(round(lb)))
         lb *= (dic['CPMG']['DW2'])                          # in points
     else:
@@ -180,7 +180,7 @@ def global_apod(dic, data):
     nbPtApod = dic['CPMG']['nbPtSignal']
     ndata = data[:]                                 # avoid data corruption
     dureeSignal = 1e3*dic['CPMG']['dureeSignal']            # 5 T2
-    lb_Hz = 1e3 / (np.pi * dureeSignal)                     # T2 in Hz
+    lb_Hz = 2 * 1e3 / (np.pi * dureeSignal)                 # T2 in Hz
     lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
     apod = np.ones(nbPtApod)
     apod = ng.proc_base.em(apod, lb)
@@ -593,9 +593,9 @@ def main():
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
     # Denoising method
-    dic, FIDsum = fid_sum(dic, FIDapod, firstIntact=True)   # decrease nbEchoes
+    dic, FIDsum = fid_sum(dic, FIDapod2, firstIntact=True)  # decrease nbEchoes
     FIDden, k_thres = denoise_nmr.denoise(
-        FIDsum, k_thres='auto', max_err=7.5)                # denoising
+        FIDsum, k_thres='auto', max_err='auto')             # denoising
     FIDtrunc = trunc(dic, FIDden)                           # truncation
     # Plotting
     plot_function(
