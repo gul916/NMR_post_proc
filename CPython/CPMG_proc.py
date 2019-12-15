@@ -45,7 +45,7 @@ def data_export(dic, E, F, H, k_thres):
         apodEcho = dic['CPMG']['apodEcho']
         apodFull = dic['CPMG']['apodFull']
         firstDec = dic['CPMG']['firstDec']
-        nbEchoApod = dic['CPMG']['nbEchoApod']
+        nbEcho = dic['CPMG']['nbEcho']
         nbEchoDen = dic['CPMG']['nbEchoDen']
         nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
         firstMax = int(not(firstDec)) * nbPtHalfEcho
@@ -63,19 +63,19 @@ def data_export(dic, E, F, H, k_thres):
         # Writing title
         data_dir = sys.argv[1][:-1]
         with open(data_dir+'1/title', 'w+') as file:
-            file.write('Reference spectrum\n')
+            file.write('No CPMG\n')
             file.write(
                 'Apodisation {:s} and {:s}'.format(apodEcho, apodFull))
         with open(data_dir+'2/title', 'w+') as file:
             file.write('Spikelets method\n')
             file.write(
                 'Apodisation {:s} and {:s}, {:d} echoes'
-                .format(apodEcho, apodFull, nbEchoApod))
+                .format(apodEcho, apodFull, nbEcho))
         with open(data_dir+'3/title', 'w+') as file:
             file.write('Weighted sum method\n')
             file.write(
                 'Apodisation {:s} and {:s}, {:d} echoes'
-                .format(apodEcho, apodFull, nbEchoApod))
+                .format(apodEcho, apodFull, nbEcho))
         with open(data_dir+'4/title', 'w+') as file:
             file.write('Denoising method\n')
             file.write(
@@ -87,6 +87,9 @@ def data_export(dic, E, F, H, k_thres):
         postproc.export_data(dic, SPC_F, data_dir + '3')
         postproc.export_data(dic, SPC_H, data_dir + '4')
 
+#%%----------------------------------------------------------------------------
+### Preprocessing
+###----------------------------------------------------------------------------
 def shift_FID(dic, data):
     """Correct dead time and echo delay"""
     # TODO: keep or discard first (half)-echo
@@ -132,7 +135,6 @@ def shift_FID(dic, data):
         ndata2[sliceNdata2] = ndata[sliceNdata]
     if sumShift // (nbPtHalfEcho * 2) >= 1:         # update dictionnary
         dic['CPMG']['nbEcho'] -= sumShift // (nbPtHalfEcho * 2)
-        dic['CPMG']['nbEchoApod'] = dic['CPMG']['nbEcho']
         dic['CPMG']['nbHalfEcho'] -= 2 * sumShift // (nbPtHalfEcho * 2)
         dic['CPMG']['nbPtSignal'] = nbPtHalfEcho * dic['CPMG']['nbHalfEcho']
     dic['CPMG']['halfEcho'] = nbPtHalfEcho * dw2
@@ -150,10 +152,10 @@ def echo_apod(dic, data, method):
     if method == 'cos':
         dic['CPMG']['apodEcho'] = 'cos'
     elif method == 'exp':
-        T2 = dic['CPMG']['halfEcho']                        # in seconds
-        lb = (1 / (np.pi * T2))                             # in Hz
-        dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(int(lb)))
-        lb *= (dic['CPMG']['DW2'])                          # in points
+        halfEcho = dic['CPMG']['halfEcho']                  # in seconds
+        lb_Hz = (2 / (np.pi * halfEcho))                    # in Hz
+        lb = lb_Hz * (dic['CPMG']['DW2'])                   # in points
+        dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(round(lb_Hz)))
     else:
         raise NotImplementedError('Unkown method for echo apodisation')
     for i in range(dic['CPMG']['nbHalfEcho']):
@@ -173,79 +175,24 @@ def echo_apod(dic, data, method):
     ndata = ndata * apod
     return dic, ndata
 
-def findMaxEcho(dic, data):
-    """Find maximum of each echo"""
-    ndata = data[:]                                 # avoid data corruption
-    nbHalfEcho = dic['CPMG']['nbHalfEcho']
-    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    firstDec = dic['CPMG']['firstDec']
-    ms_scale = dic['CPMG']['ms_scale']
-    maxEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
-    timeEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
-    for i in range(int(not(firstDec)), nbHalfEcho, 2):
-        maxSlice = slice(i * nbPtHalfEcho, (i+1) * nbPtHalfEcho)
-        maxIndex = i * nbPtHalfEcho
-        maxEcho[i//2] = max(abs(ndata[maxSlice]))           # max of echo
-        timeEcho[i//2] = ms_scale[maxIndex]                 # time of echo
-    maxEcho = maxEcho / max(maxEcho)                        # normalization
-    return timeEcho, maxEcho
-
-def fit_func(p, x):
-    """Relaxation function"""
-    M0, T2, noise = p
-    fit = M0 * np.exp(-np.array(x) / T2) + noise
-    return fit
-
-def findT2(dic, data):
-    """Fitting function and residuals calculation"""
-    def residuals(p, x, y):
-        err = y - fit_func(p, x)
-        return err
-    dureeSignal = 1e3*dic['CPMG']['dureeSignal']
-    firstDec = dic['CPMG']['firstDec']
-    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    firstMin = int(firstDec) * nbPtHalfEcho
-    timeEcho, maxEcho = findMaxEcho(dic, data)
-    # fit the trajectory using leastsq
-    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
-    fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
-    # Find end of signal
-    T2 = fitEcho[0][1]                                      # in milliseconds
-    if T2 < 1e3*dic['CPMG']['halfEcho']:                    # too short T2
-        nbPtApod = dic['CPMG']['nbPtSignal']
-        T2 = dureeSignal
-    elif 3*T2 > dureeSignal:                                # too long T2
-        nbPtApod = dic['CPMG']['nbPtSignal']
-        T2 = min(T2, dureeSignal)
-    else:                                                   # intermediate T2
-        nbPtApod = np.argwhere(dic['CPMG']['ms_scale'] > 3*T2)[0][0]
-    if (nbPtApod - firstMin) % (2*nbPtHalfEcho) != 0:
-        nbPtApod = (
-            ((nbPtApod - firstMin) // (2*nbPtHalfEcho) + 1)
-            *2*nbPtHalfEcho + firstMin)           # round to next full echo
-    dic['CPMG']['timeEcho'] = timeEcho
-    dic['CPMG']['maxEcho'] = maxEcho
-    dic['CPMG']['fitEcho'] = fitEcho
-    dic['CPMG']['T2'] = T2
-    dic['CPMG']['nbPtApod'] = nbPtApod
-    return dic
-
-def global_apod(dic, data):
+def global_apod(dic, data, method):
     """Global apodisation"""
+    nbPtApod = dic['CPMG']['nbPtSignal']
     ndata = data[:]                                 # avoid data corruption
-    nbPtApod = dic['CPMG']['nbPtApod']
-    firstDec = dic['CPMG']['firstDec']
-    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    firstMin = int(firstDec) * nbPtHalfEcho
-    lb_Hz = (1e3 / (np.pi * dic['CPMG']['T2']))             # in Hz
-    lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
     apod = np.ones(nbPtApod)
-    apod = ng.proc_base.em(apod, lb)
-    ndata = ndata[:nbPtApod] * apod                # discard useless points
-    nbEchoApod = int((nbPtApod - firstMin) // (2*nbPtHalfEcho))
-    dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(int(lb_Hz)))
+    if method == 'cos':
+        apod = ng.proc_base.sp(apod, off=0.5, end=1, pow=1.0)
+        dic['CPMG']['apodFull'] = 'cos'
+    elif method == 'exp':
+        dureeSignal = 1e3*dic['CPMG']['dureeSignal']            # 5 T2
+        lb_Hz = 2 * 1e3 / (np.pi * dureeSignal)                 # T2 in Hz
+        lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
+        apod = ng.proc_base.em(apod, lb)
+        dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(round(lb_Hz)))
+    else:
+        raise NotImplementedError('Unkown method for global apodisation')
+    ndata = ndata[:nbPtApod] * apod                # apply apodisation
     dic['CPMG']['apodFullPoints'] = apod
-    dic['CPMG']['nbEchoApod'] = nbEchoApod
     return dic, ndata
 
 #%%----------------------------------------------------------------------------
@@ -254,13 +201,13 @@ def global_apod(dic, data):
 def echo_sep(dic, data):
     """Separation of echoes into a matrix"""
     firstDec = dic['CPMG']['firstDec']
-    nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbEcho = dic['CPMG']['nbEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     ndata = np.zeros(
-        (nbEchoApod+int(firstDec), nbPtHalfEcho*2), dtype='complex128')
+        (nbEcho+int(firstDec), nbPtHalfEcho*2), dtype='complex128')
     if firstDec == True:
         ndata[0, nbPtHalfEcho:] = data[:nbPtHalfEcho]
-    for row in range(nbEchoApod):
+    for row in range(nbEcho):
         ndata[row+int(firstDec), :] = (data[
             (2*row+int(firstDec))*nbPtHalfEcho:
             (2*row+int(firstDec)+2)*nbPtHalfEcho])
@@ -398,22 +345,74 @@ def trunc(dic, data):
     return ndata
 
 #%%----------------------------------------------------------------------------
+### T2 measurement
+###----------------------------------------------------------------------------
+def findMaxEcho(dic, data):
+    """Find maximum of each echo"""
+    ndata = data[:]                                 # avoid data corruption
+    nbHalfEcho = dic['CPMG']['nbHalfEcho']
+    nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
+    firstDec = dic['CPMG']['firstDec']
+    ms_scale = dic['CPMG']['ms_scale']
+    maxEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
+    timeEcho = np.zeros(int(np.ceil(nbHalfEcho / 2)))
+    for i in range(int(not(firstDec)), nbHalfEcho, 2):
+        maxSlice = slice(i * nbPtHalfEcho, (i+1) * nbPtHalfEcho)
+        maxIndex = i * nbPtHalfEcho
+        maxEcho[i//2] = max(abs(ndata[maxSlice]))           # max of echo
+        timeEcho[i//2] = ms_scale[maxIndex]                 # time of echo
+    maxEcho = maxEcho / max(maxEcho)                        # normalization
+    dic['CPMG']['timeEcho'] = timeEcho
+    dic['CPMG']['maxEcho'] = maxEcho
+    return dic
+
+def findT2(dic, data):
+    """Fitting function and residuals calculation"""
+    def fit_func(p, x):
+        """Relaxation function"""
+        M0, T2, noise = p
+        fit = M0 * np.exp(-np.array(x) / T2) + noise
+        return fit
+    def residuals(p, x, y):
+        """Calculate difference between data and fitting function"""
+        err = y - fit_func(p, x)
+        return err
+    timeEcho = dic['CPMG']['timeEcho']
+    maxEcho = dic['CPMG']['maxEcho']
+    ms_scale = dic['CPMG']['ms_scale']
+    # fit the trajectory using leastsq
+    p0 = [1.0, timeEcho[timeEcho.size // 2], maxEcho[-1]]   # initial guess
+    fitEcho = sp.optimize.leastsq(residuals, p0, args=(timeEcho, maxEcho))
+    # final fit
+    fitTime = np.linspace(ms_scale[0], ms_scale[-1], 100)
+    fitVal = fit_func(fitEcho[0], fitTime)
+    dic['CPMG']['fitEcho'] = fitEcho
+    dic['CPMG']['fitTime'] = fitTime
+    dic['CPMG']['fitVal'] = fitVal
+    return dic
+
+#%%----------------------------------------------------------------------------
 ### Plotting
 ###----------------------------------------------------------------------------
-def echoes_figure(dic, D):
+def echoes_figure(dic, E):
     """Echoes figure"""
+    dic = findMaxEcho(dic, E)
+    dic = findT2(dic, E)                        # T2 relaxation measurement
+    Dmat = echo_sep(dic, E)                     # Separation of echoes
+    row, col = Dmat.shape
     fitEcho = dic['CPMG']['fitEcho']
+    fitTime = dic['CPMG']['fitTime']
+    fitVal = dic['CPMG']['fitVal']
     maxEcho = dic['CPMG']['maxEcho']
     timeEcho = dic['CPMG']['timeEcho']
     ms_scale = dic['CPMG']['ms_scale']
     nbEcho = dic['CPMG']['nbEcho']
-    Dmat = echo_sep(dic, D)
-    row, col = Dmat.shape
+
     fig = plt.figure()
     fig.suptitle('CPMG NMR signal processing - echoes', fontsize=16)
 
     ax1 = fig.add_subplot(211)
-    ax1.set_title('Separated FID, {:d} echoes'.format(nbEcho))
+    ax1.set_title('Separated FID, {:d} apodised echoes'.format(nbEcho))
     ax1.set_xlabel('Time (ms)')
     ax1.set_ylabel('Intensity')
     for i in range(0, row, max(2, int(row/10))):
@@ -424,11 +423,10 @@ def echoes_figure(dic, D):
 
     ax2 = fig.add_subplot(212)
     ax2.set_title(
-        'Intensity of echoes, T2 = {:8.2f} ms'.format(fitEcho[0][1]))
-    timeFit = np.linspace(ms_scale[0], ms_scale[-1], 100)
-    valFit = fit_func(fitEcho[0], timeFit)
+        'Intensity of apodised echoes, measured T2 = {:8.2f} ms'
+        .format(fitEcho[0][1]))
     ax2.scatter(timeEcho, maxEcho)
-    ax2.plot(timeFit, valFit)
+    ax2.plot(fitTime, fitVal)
     ax2.set_xlabel('Time (ms)')
     ax2.set_ylabel('Intensity')
     
@@ -444,7 +442,6 @@ def apod_figure(dic, B, D, E):
     halfEcho = dic['CPMG']['halfEcho']
     ms_scale = dic['CPMG']['ms_scale']
     nbEcho = dic['CPMG']['nbEcho']
-    nbEchoApod = dic['CPMG']['nbEchoApod']
     # Normalisation
     B /= max(B.real)
     D /= max(D.real)
@@ -460,15 +457,15 @@ def apod_figure(dic, B, D, E):
     
     ax2 = fig.add_subplot(312)
     ax2.set_title(
-        'Apodised FID, {:s}, {:d} echoes'.format(apodEcho, nbEcho))
+        'Individual apodisation, {:s}, {:d} echoes'.format(apodEcho, nbEcho))
     ax2.plot(ms_scale[:D.size], D.real)
     ax2.plot(ms_scale[:apodEchoPoints.size], apodEchoPoints.real)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     
     ax3 = fig.add_subplot(313)
     ax3.set_title(
-        'Apodised FID, {:s} and {:s}, {:d} echoes'
-        .format(apodEcho, apodFull, nbEchoApod))
+        'Individual and global apodisation, {:s} and {:s}, {:d} echoes'
+        .format(apodEcho, apodFull, nbEcho))
     ax3.plot(ms_scale[:E.size], E.real)
     ax3.plot(ms_scale[:apodFullPoints.size], apodFullPoints.real)
     ax3.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
@@ -481,7 +478,7 @@ def sum_figure(dic, E, F, A, C):
     firstDec = dic['CPMG']['firstDec']
     apodEcho = dic['CPMG']['apodEcho']
     apodFull = dic['CPMG']['apodFull']
-    nbEchoApod = dic['CPMG']['nbEchoApod']
+    nbEcho = dic['CPMG']['nbEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
     Hz_scale = dic['CPMG']['Hz_scale']
     firstMax = int(not(firstDec)) * nbPtHalfEcho
@@ -508,14 +505,14 @@ def sum_figure(dic, E, F, A, C):
     ax1 = fig.add_subplot(311)
     ax1.set_title(
         'Spikelets method, {:s} and {:s}, {:d} echoes'
-        .format(apodEcho, apodFull, nbEchoApod))
+        .format(apodEcho, apodFull, nbEcho))
     ax1.plot(Hz_scale, SPC_E.real)
     ax1.invert_xaxis()
 
     ax2 = fig.add_subplot(312)
     ax2.set_title(
         'Weighted sum method, {:s} and {:s}, {:d} echoes'
-        .format(apodEcho, apodFull, nbEchoApod))
+        .format(apodEcho, apodFull, nbEcho))
     ax2.plot(Hz_scale, SPC_F.real)
     ax2.invert_xaxis()
 
@@ -582,7 +579,7 @@ def den_figure(dic, G, H, A, C, k_thres):
 def plot_function(dic, A, B, C, D, E, F, G, H, k_thres):
     """Plotting"""
     plt.ion()                                   # to avoid stop when plotting
-    echoes_figure(dic, D)
+    echoes_figure(dic, E)
     apod_figure(dic, B, D, E)
     sum_figure(dic, E, F, A, C)
     den_figure(dic, G, H, A, C, k_thres)
@@ -598,14 +595,13 @@ def main():
     dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
     # Spikelets and weighted sum methods
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apod
-    dic = findT2(dic, FIDapod)                              # relaxation
-    dic, FIDapod2 = global_apod(dic, FIDapod)               # global apod
+    dic, FIDapod2 = global_apod(dic, FIDapod, method='exp') # global apod
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
     # Denoising method
-    dic, FIDsum = fid_sum(dic, FIDapod, firstIntact=True)   # decrease nbEchoes
+    dic, FIDsum = fid_sum(dic, FIDapod2, firstIntact=True)  # decrease nbEchoes
     FIDden, k_thres = denoise_nmr.denoise(
-        FIDsum, k_thres='auto', max_err=7.5)                # denoising
+        FIDsum, k_thres='auto', max_err='auto')             # denoising
     FIDtrunc = trunc(dic, FIDden)                           # truncation
     # Plotting
     plot_function(

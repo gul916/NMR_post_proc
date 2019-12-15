@@ -20,8 +20,9 @@ def main():
     dic, FIDshift = CPMG_proc.shift_FID(dic, FIDraw)        # dead time
     dic, FIDapod = CPMG_proc.echo_apod(
         dic, FIDshift, method='exp')                        # echoes apod
-    dic = CPMG_proc.findT2(dic, FIDapod)                    # relaxation
-    plot_function(dic, FIDapod)                             # plotting
+    dic, FIDapod2 = CPMG_proc.global_apod(
+        dic, FIDapod, method='exp')                         # global apod
+    plot_function(dic, FIDapod2)                            # plotting
 
 if __name__ == "__main__":
     main()
