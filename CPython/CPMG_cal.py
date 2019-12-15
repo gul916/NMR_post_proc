@@ -16,8 +16,9 @@ def plot_function(dic, D):
     plt.show()                                  # to allow zooming
 
 def main():
-    dic, _, FIDraw = CPMG_proc.data_import()                # importation
-    dic, FIDshift = CPMG_proc.shift_FID(dic, FIDraw)        # dead time
+    dic, FIDref, FIDraw = CPMG_proc.data_import()           # importation
+    dic, FIDref, FIDshift = CPMG_proc.shift_FID(
+        dic, FIDref, FIDraw)                                # dead time
     dic, FIDapod = CPMG_proc.echo_apod(
         dic, FIDshift, method='exp')                        # echoes apod
     dic, FIDapod2 = CPMG_proc.global_apod(

@@ -40,7 +40,6 @@ def data_import():
 
 def data_export(dic, E, F, H, k_thres):
     """Export data"""
-    # TODO: find dephasing bug
     if len(sys.argv) > 1:                                   # save spectrum
         apodEcho = dic['CPMG']['apodEcho']
         apodFull = dic['CPMG']['apodFull']
@@ -90,10 +89,12 @@ def data_export(dic, E, F, H, k_thres):
 #%%----------------------------------------------------------------------------
 ### Preprocessing
 ###----------------------------------------------------------------------------
-def shift_FID(dic, data):
+def shift_FID(dic, dataRef, data):
     """Correct dead time and echo delay"""
     # TODO: keep or discard first (half)-echo
     ndata = data[:]                                 # avoid data corruption
+    if dataRef is not None:
+        ndataRef = dataRef[:]
     nbPtShift = dic['CPMG']['nbPtShift']
     firstDec = dic['CPMG']['firstDec']
     dw2 = dic['CPMG']['DW2']
@@ -101,22 +102,39 @@ def shift_FID(dic, data):
     nbEcho = dic['CPMG']['nbEcho']
     halfEcho = dic['CPMG']['halfEcho']
     nbPtHalfEcho = dic['CPMG']['nbPtHalfEcho']
-    # Correct dead time
+    
+    # Correct fist-order phase (dead time)
     if nbPtShift < 0:                                       # left shift
         ndata = ng.proc_base.ls(ndata, -nbPtShift)
+        if dataRef is None:
+            ndataRef = ng.proc_base.ls(data[:], -nbPtShift)
         dic['CPMG']['nbPtShift'] = 0                        # update dictionary
     elif nbPtShift > 0:                                     # right shift
         # Backward linear prediction increases errors
         # ndata = ng.proc_lp.lp(ndata, nbPtShift, mode='b', append='before')
         ndata = ng.proc_base.rs(ndata, nbPtShift)
+        if dataRef is None:
+            ndataRef = ng.proc_base.rs(data[:], nbPtShift)
+    
+    # Correct zero-order phase on first full echo maximum
+    fullEchoTop = ndata[(int(firstDec)+1)*nbPtHalfEcho]
+    ph0 = 180 / np.pi * np.arctan(fullEchoTop.imag / fullEchoTop.real)
+    if fullEchoTop.real < 0:
+        ph0 += 180
+    ndata = ng.proc_base.ps(ndata, p0=-ph0, p1=0.0)
+    ndataRef = ng.proc_base.ps(ndataRef, p0=-ph0, p1=0.0)
+    
     # Correct echo delay
     rest = 0.0
     sumShift = 0
     ndata2 = np.zeros(td2, dtype='complex128')
+    ndataRef2 = np.zeros(td2, dtype='complex128')
     if firstDec == True:                                    # first echo
         ndata2[:nbPtHalfEcho] = ndata[:nbPtHalfEcho]
+        ndataRef2[:nbPtHalfEcho] = ndataRef[:nbPtHalfEcho]
     else:
         ndata2[:2*nbPtHalfEcho] = ndata[:2*nbPtHalfEcho]
+        ndataRef2[:2*nbPtHalfEcho] = ndataRef[:2*nbPtHalfEcho]
     for i in range(int(not(firstDec)), nbEcho):             # following echoes
         sliceNdata2 = slice(
             (int(firstDec) + 2*i) * nbPtHalfEcho - sumShift,
@@ -133,13 +151,16 @@ def shift_FID(dic, data):
                 (int(firstDec) + 2*i) * nbPtHalfEcho,
                 (int(firstDec) + 2*(i+1)) * nbPtHalfEcho)
         ndata2[sliceNdata2] = ndata[sliceNdata]
-    if sumShift // (nbPtHalfEcho * 2) >= 1:         # update dictionnary
+        ndataRef2[sliceNdata2] = ndataRef[sliceNdata]
+
+    # Update dictionnary
+    if sumShift // (nbPtHalfEcho * 2) >= 1:
         dic['CPMG']['nbEcho'] -= sumShift // (nbPtHalfEcho * 2)
         dic['CPMG']['nbHalfEcho'] -= 2 * sumShift // (nbPtHalfEcho * 2)
         dic['CPMG']['nbPtSignal'] = nbPtHalfEcho * dic['CPMG']['nbHalfEcho']
     dic['CPMG']['halfEcho'] = nbPtHalfEcho * dw2
     dic['CPMG']['fullEcho'] = halfEcho * 2
-    return dic, ndata2
+    return dic, ndataRef2, ndata2
 
 #%%----------------------------------------------------------------------------
 ### Apodisation
@@ -483,9 +504,6 @@ def sum_figure(dic, E, F, A, C):
     Hz_scale = dic['CPMG']['Hz_scale']
     firstMax = int(not(firstDec)) * nbPtHalfEcho
     nextMin = (int(not(firstDec)) + 1) * nbPtHalfEcho
-    # Reference spectrum
-    if A is None:
-        A = C
     # First echo shift
     SPC_E = E[firstMax:]
     SPC_F = F[:]
@@ -536,9 +554,6 @@ def den_figure(dic, G, H, A, C, k_thres):
         firstMaxDen = nbPtHalfEcho
     else:
         firstMaxDen = firstMax
-    # Reference spectrum
-    if A is None:
-        A = C
     # First echo shift
     SPC_G = G[firstMaxDen:]
     SPC_H = H[:]
@@ -592,7 +607,7 @@ def plot_function(dic, A, B, C, D, E, F, G, H, k_thres):
 def main():
     """Main CPMG processing function"""
     dic, FIDref, FIDraw = data_import()                     # importation
-    dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
+    dic, FIDref, FIDshift = shift_FID(dic, FIDref, FIDraw)  # dead time
     # Spikelets and weighted sum methods
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apod
     dic, FIDapod2 = global_apod(dic, FIDapod, method='exp') # global apod

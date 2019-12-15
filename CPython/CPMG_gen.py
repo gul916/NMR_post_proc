@@ -16,9 +16,9 @@ import postproc
 ###----------------------------------------------------------------------------
 
 # Asked to the user
-firstDec = True
 fullEcho = 10e-3
 nbEcho = 19
+firstDec = True
 
 # From Topspin interface
 td = 4000                       # nb of real points + nb of imag points
@@ -31,6 +31,7 @@ mean = 0
 std = 0.3
 
 # 1st frequency
+ph0 = 90                        # global zero order phase in degrees
 amp1 = 1                        # amplitude
 nu1 = 2000                      # frequency in Hz
 t21 = 30e-3                     # true T2 relaxation time
@@ -99,9 +100,9 @@ def signal_generation():
         Aref = np.concatenate((Aref, yi))
         desc = not(desc)
     
-    # Final points
+    # Final points and zero order phase
     end = np.zeros(nbPtLast, dtype=np.complex)
-    Aref = np.concatenate((Aref,end))
+    Aref = np.concatenate((Aref,end)) * np.exp(1j*2*np.pi*ph0/360)
 
     # Suppression of points during dead time 
     end = np.zeros(nbPtShift, dtype=np.complex)
