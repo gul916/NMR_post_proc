@@ -158,7 +158,7 @@ def plot_function(dic, Aref, Anoisy):
     
     # Spectra display
     ax3 = fig.add_subplot(313)
-    ax3.set_title('Noisy SPC and truncated reference SPC')
+    ax3.set_title('Noisy SPC and reference SPC')
     ax3.plot(Hz_scale, AnoisySPC.real)
     ax3.plot(Hz_scale, ArefSPC.real)
     ax3.invert_xaxis()

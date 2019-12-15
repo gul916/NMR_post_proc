@@ -63,7 +63,7 @@ def data_export(dic, E, F, H, k_thres):
         # Writing title
         data_dir = sys.argv[1][:-1]
         with open(data_dir+'1/title', 'w+') as file:
-            file.write('Reference spectrum\n')
+            file.write('No CPMG\n')
             file.write(
                 'Apodisation {:s} and {:s}'.format(apodEcho, apodFull))
         with open(data_dir+'2/title', 'w+') as file:
@@ -457,14 +457,14 @@ def apod_figure(dic, B, D, E):
     
     ax2 = fig.add_subplot(312)
     ax2.set_title(
-        'Apodised FID, {:s}, {:d} echoes'.format(apodEcho, nbEcho))
+        'Individual apodisation, {:s}, {:d} echoes'.format(apodEcho, nbEcho))
     ax2.plot(ms_scale[:D.size], D.real)
     ax2.plot(ms_scale[:apodEchoPoints.size], apodEchoPoints.real)
     ax2.set_xlim([-halfEcho * 1e3, (acquiT + halfEcho)*1e3])
     
     ax3 = fig.add_subplot(313)
     ax3.set_title(
-        'Apodised FID, {:s} and {:s}, {:d} echoes'
+        'Individual and global apodisation, {:s} and {:s}, {:d} echoes'
         .format(apodEcho, apodFull, nbEcho))
     ax3.plot(ms_scale[:E.size], E.real)
     ax3.plot(ms_scale[:apodFullPoints.size], apodFullPoints.real)
