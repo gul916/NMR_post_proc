@@ -36,11 +36,14 @@ If you further modify CPython_init.py, you will need to remove CPython_init$py.c
 
 ### Citing this work
 - Concerning Signal-to-Noise Ratio (SNR) and Singular Value Decomposition (SVD) generalities
+
 G. Laurent, W. Woelffel, V. Barret-Vivin, E. Gouillart, and C. Bonhomme
 ‘Denoising applied to spectroscopies – part I: concept and limits’
 Appl. Spectrosc. Rev., vol. 54, no. 7, pp. 602–630, 2019.
 Available at https://hal.archives-ouvertes.fr/hal-01879736
+
 - Concerning SVD computation time and denoising program
+
 G. Laurent, P.-A. Gilles, W. Woelffel, V. Barret-Vivin, E. Gouillart, and C. Bonhomme
 ‘Denoising applied to spectroscopies – Part II: Decreasing computation time’
 Appl. Spectrosc. Rev., in press, 2019, doi: 10.1080/05704928.2018.1559851
