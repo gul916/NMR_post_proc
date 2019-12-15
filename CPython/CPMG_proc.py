@@ -152,10 +152,10 @@ def echo_apod(dic, data, method):
     if method == 'cos':
         dic['CPMG']['apodEcho'] = 'cos'
     elif method == 'exp':
-        T2 = dic['CPMG']['halfEcho']                        # in seconds
-        lb = (2 / (np.pi * T2))                             # in Hz
-        dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(round(lb)))
-        lb *= (dic['CPMG']['DW2'])                          # in points
+        halfEcho = dic['CPMG']['halfEcho']                  # in seconds
+        lb_Hz = (2 / (np.pi * halfEcho))                    # in Hz
+        lb = lb_Hz * (dic['CPMG']['DW2'])                   # in points
+        dic['CPMG']['apodEcho'] = 'LB = {:s} Hz'.format(str(round(lb_Hz)))
     else:
         raise NotImplementedError('Unkown method for echo apodisation')
     for i in range(dic['CPMG']['nbHalfEcho']):
@@ -175,17 +175,23 @@ def echo_apod(dic, data, method):
     ndata = ndata * apod
     return dic, ndata
 
-def global_apod(dic, data):
+def global_apod(dic, data, method):
     """Global apodisation"""
     nbPtApod = dic['CPMG']['nbPtSignal']
     ndata = data[:]                                 # avoid data corruption
-    dureeSignal = 1e3*dic['CPMG']['dureeSignal']            # 5 T2
-    lb_Hz = 2 * 1e3 / (np.pi * dureeSignal)                 # T2 in Hz
-    lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
     apod = np.ones(nbPtApod)
-    apod = ng.proc_base.em(apod, lb)
-    ndata = ndata[:nbPtApod] * apod                # discard useless points
-    dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(round(lb_Hz)))
+    if method == 'cos':
+        apod = ng.proc_base.sp(apod, off=0.5, end=1, pow=1.0)
+        dic['CPMG']['apodFull'] = 'cos'
+    elif method == 'exp':
+        dureeSignal = 1e3*dic['CPMG']['dureeSignal']            # 5 T2
+        lb_Hz = 2 * 1e3 / (np.pi * dureeSignal)                 # T2 in Hz
+        lb = lb_Hz * (dic['CPMG']['DW2'])                       # in points
+        apod = ng.proc_base.em(apod, lb)
+        dic['CPMG']['apodFull'] = 'LB = {:s} Hz'.format(str(round(lb_Hz)))
+    else:
+        raise NotImplementedError('Unkown method for global apodisation')
+    ndata = ndata[:nbPtApod] * apod                # apply apodisation
     dic['CPMG']['apodFullPoints'] = apod
     return dic, ndata
 
@@ -589,7 +595,7 @@ def main():
     dic, FIDshift = shift_FID(dic, FIDraw)                  # dead time
     # Spikelets and weighted sum methods
     dic, FIDapod = echo_apod(dic, FIDshift, method='exp')   # echoes apod
-    dic, FIDapod2 = global_apod(dic, FIDapod)               # global apod
+    dic, FIDapod2 = global_apod(dic, FIDapod, method='exp') # global apod
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
     # Denoising method
