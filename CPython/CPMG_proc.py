@@ -290,7 +290,7 @@ def fid_sum(dic, data, firstIntact=True):
                 (firstSum + 2*i) * nbPtHalfEcho,
                 (firstSum + 2*i + 2) * nbPtHalfEcho)
             # Averaging increases noise discontinuities
-#            ndata[sliceNdata] = sumEcho / nbEchoSum
+            # ndata[sliceNdata] = sumEcho / nbEchoSum
             ndata[sliceNdata] = sumEcho                     # new data
         # Last echo
         for i in range(nbEcho2-1, nbEcho2):
@@ -304,7 +304,7 @@ def fid_sum(dic, data, firstIntact=True):
                 (firstSum + 2*i) * nbPtHalfEcho,
                 (firstSum + 2*i + 2) * nbPtHalfEcho)
             # Averaging increases noise discontinuities
-#            ndata[sliceNdata] = sumEcho / nbEchoSum
+            # ndata[sliceNdata] = sumEcho / nbEchoSum
             ndata[sliceNdata] = sumEcho                     # new data
             # Update dictionary
         dic['CPMG']['nbEchoDen'] = nbEcho2 + firstSum//2
@@ -593,6 +593,7 @@ def den_figure(dic, G, H, A, C, k_thres):
 
 def plot_function(dic, A, B, C, D, E, F, G, H, k_thres):
     """Plotting"""
+    # TODO: T2 figure
     plt.ion()                                   # to avoid stop when plotting
     echoes_figure(dic, E)
     apod_figure(dic, B, D, E)
@@ -614,7 +615,7 @@ def main():
     FIDmat = echo_sep(dic, FIDapod2)                        # echoes separation
     FIDmatSum = mat_sum(dic, FIDmat)                        # echoes sum
     # Denoising method
-    dic, FIDsum = fid_sum(dic, FIDapod2, firstIntact=True)  # decrease nbEchoes
+    dic, FIDsum = fid_sum(dic, FIDapod2, firstIntact=False) # decrease nbEchoes
     FIDden, k_thres = denoise_nmr.denoise(
         FIDsum, k_thres='auto', max_err='auto')             # denoising
     FIDtrunc = trunc(dic, FIDden)                           # truncation
